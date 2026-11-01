@@ -1,0 +1,76 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android Platform 35 & Build-Tools
+        run: |
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Restore Binaries & Permissions
+        run: |
+          chmod +x ./ci/restore-binaries.sh ./gradlew
+          ./ci/restore-binaries.sh
+
+      - name: Build Debug & Release APK
+        run: |
+          ./gradlew assembleDebug assembleRelease --stacktrace
+
+      - name: Verify APK Output
+        run: |
+          ls -la app/build/outputs/apk/debug/
+          ls -la app/build/outputs/apk/release/
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/TPVoiceBrain-v1.0.0-debug.apk
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk dist/TPVoiceBrain-v1.0.0-release.apk
+          fi
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tp-voice-brain-apk
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        with:
+          tag_name: v1.0.0
+          name: "TP Voice Brain Android Native v1.0.0"
+          body: |
+            ## TP Voice Brain Android 原生应用 (Jetpack Compose)
+            
+            - 全双工实时流式 ASR (Paraformer-realtime-v2 + Qwen-flash 句级快修)
+            - 9 种 Koboyo 认知角色人设纪要与思维导图
+            - 双视图结构化对账与排版润色正式稿 Markdown
+            - 个人第二大脑长期记忆沉淀与自然语言问答
+            - Obsidian Vault & Hermes Agent 联动与反向追记
+          files: dist/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
