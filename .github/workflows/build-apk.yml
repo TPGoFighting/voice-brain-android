@@ -45,9 +45,9 @@ jobs:
           ls -la app/build/outputs/apk/debug/
           ls -la app/build/outputs/apk/release/
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/TPVoiceBrain-v1.0.0-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist/TPVoiceBrain-v1.0.1-debug.apk
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk dist/TPVoiceBrain-v1.0.0-release.apk
+            cp app/build/outputs/apk/release/app-release.apk dist/TPVoiceBrain-v1.0.1-release.apk
           fi
 
       - name: Upload APK Artifact
@@ -61,16 +61,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
-          tag_name: v1.0.0
-          name: "TP Voice Brain Android Native v1.0.0"
+          tag_name: v1.0.1
+          name: "TP Voice Brain Android Native v1.0.1"
           body: |
-            ## TP Voice Brain Android 原生应用 (Jetpack Compose)
+            ## TP Voice Brain Android 原生应用 (Jetpack Compose) v1.0.1 更新说明
             
-            - 全双工实时流式 ASR (Paraformer-realtime-v2 + Qwen-flash 句级快修)
-            - 9 种 Koboyo 认知角色人设纪要与思维导图
-            - 双视图结构化对账与排版润色正式稿 Markdown
-            - 个人第二大脑长期记忆沉淀与自然语言问答
-            - Obsidian Vault & Hermes Agent 联动与反向追记
+            - 【ASR 流式识别修复】修复了云端 WebSocket ASR 转发与阿里 Fun-ASR 实时流链路连接异常，实现端侧 16kHz PCM 全双工极速打字与实时句级清洗。
+            - 【音频无损导出重构】集成 Android MediaStore 与 FileProvider，导出无损 WAV 文件会自动同步至手机「下载 (Downloads)」目录，并立即唤起原生系统分享面板（支持一键存入文件管理、微信、网盘或邮件）。
+            - 【端侧录音源健壮性】强化 AudioRecord 初始化容错策略（优先 MIC 硬件输入并平滑兜底语音识别源），杜绝音频帧内存复写。
           files: dist/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -130,22 +130,23 @@ fun LiveWorkbenchTab(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
                         .clickable(onClick = onExportWav)
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Download,
-                        contentDescription = "下载WAV",
+                        contentDescription = "导出WAV",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
-                        text = "导出本次无损WAV",
+                        text = "导出无损WAV",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }

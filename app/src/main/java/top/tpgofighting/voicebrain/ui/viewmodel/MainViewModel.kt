@@ -54,6 +54,10 @@ data class MainUiState(
     val toastMessage: String? = null
 )
 
+sealed class MainUiEvent {
+    data class ShareWavFile(val file: File, val message: String) : MainUiEvent()
+}
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "MainViewModel"
@@ -63,6 +67,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    private val _uiEvents = MutableSharedFlow<MainUiEvent>(extraBufferCapacity = 1)
+    val uiEvents: SharedFlow<MainUiEvent> = _uiEvents.asSharedFlow()
 
     private var audioRecorder: AudioRecorderManager? = null
     private var webSocketManager: AsrWebSocketManager? = null
@@ -285,11 +292,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun exportCurrentWav(): File? {
         val file = audioRecorder?.exportWavFile() ?: _uiState.value.exportedWavFile
-        if (file != null) {
+        if (file != null && file.exists() && file.length() > 44) {
             _uiState.update { it.copy(exportedWavFile = file) }
-            showToast("无损音频已保存至: ${file.name}")
+            val msg = "无损音频已保存至下载目录: ${file.name}"
+            showToast(msg)
+            viewModelScope.launch {
+                _uiEvents.emit(MainUiEvent.ShareWavFile(file, msg))
+            }
         } else {
-            showToast("当前暂无录音音频数据")
+            showToast("当前暂无录音音频数据，请先录制一段语音")
         }
         return file
     }

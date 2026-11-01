@@ -1,16 +1,18 @@
 package top.tpgofighting.voicebrain.data.audio
 
 import android.annotation.SuppressLint
+import android.content.ContentValues
 import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import kotlinx.coroutines.*
 import java.io.File
 import java.io.FileOutputStream
-import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.sqrt
@@ -43,30 +45,63 @@ class AudioRecorderManager(
     var totalChunksSent: Long = 0
         private set
 
+    var lastExportedWavFile: File? = null
+        private set
+
+    fun hasRecordedData(): Boolean {
+        synchronized(recordedSamples) {
+            return recordedSamples.isNotEmpty()
+        }
+    }
+
     @SuppressLint("MissingPermission")
     fun start(): Boolean {
         if (isRecording) return true
 
         val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
-        val bufferSize = maxOf(minBufferSize, CHUNK_SIZE_BYTES * 2)
+        val bufferSize = if (minBufferSize > 0) maxOf(minBufferSize, CHUNK_SIZE_BYTES * 2) else CHUNK_SIZE_BYTES * 4
+
+        // 优先使用标准 MIC 源，若不初始化则兜底使用 VOICE_RECOGNITION
+        val audioSources = listOf(
+            MediaRecorder.AudioSource.MIC,
+            MediaRecorder.AudioSource.VOICE_RECOGNITION
+        )
+
+        var initializedRecord: AudioRecord? = null
+        for (source in audioSources) {
+            try {
+                val record = AudioRecord(
+                    source,
+                    SAMPLE_RATE,
+                    CHANNEL_CONFIG,
+                    AUDIO_FORMAT,
+                    bufferSize
+                )
+                if (record.state == AudioRecord.STATE_INITIALIZED) {
+                    initializedRecord = record
+                    Log.i(TAG, "AudioRecord initialized successfully with source: $source")
+                    break
+                } else {
+                    record.release()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to initialize AudioRecord with source $source: ${e.message}")
+            }
+        }
+
+        if (initializedRecord == null) {
+            Log.e(TAG, "AudioRecord initialization failed on all audio sources")
+            return false
+        }
+
+        audioRecord = initializedRecord
 
         try {
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                SAMPLE_RATE,
-                CHANNEL_CONFIG,
-                AUDIO_FORMAT,
-                bufferSize
-            )
-
-            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                Log.e(TAG, "AudioRecord initialization failed")
-                return false
-            }
-
             audioRecord?.startRecording()
             isRecording = true
-            recordedSamples.clear()
+            synchronized(recordedSamples) {
+                recordedSamples.clear()
+            }
             totalBytesSent = 0
             totalChunksSent = 0
 
@@ -77,7 +112,7 @@ class AudioRecorderManager(
                 while (isActive && isRecording) {
                     val readResult = audioRecord?.read(readBuffer, 0, readBuffer.size) ?: -1
                     if (readResult > 0) {
-                        // 1. 计算音量幅值 (RMS)
+                        // 1. 计算音量幅值 (RMS) 并缓存采样点
                         var sum = 0.0
                         for (i in 0 until readResult) {
                             val sample = readBuffer[i]
@@ -92,13 +127,11 @@ class AudioRecorderManager(
                             onVolume(normalizedVol)
                         }
 
-                        // 2. 转为 16-bit Little-Endian 字节并切片推送
+                        // 2. 转为 16-bit Little-Endian 字节
                         ByteBuffer.wrap(byteBuffer).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(readBuffer, 0, readResult)
-                        val chunkBytes = if (readResult * 2 == CHUNK_SIZE_BYTES) {
-                            byteBuffer
-                        } else {
-                            byteBuffer.copyOf(readResult * 2)
-                        }
+                        
+                        // 3. 必须生成独立字节副本，防止环形缓冲队列被下一帧覆写
+                        val chunkBytes = byteBuffer.copyOf(readResult * 2)
 
                         totalBytesSent += chunkBytes.size
                         totalChunksSent++
@@ -132,17 +165,17 @@ class AudioRecorderManager(
     }
 
     /**
-     * 导出本地全量录音为标准 WAV 格式文件
+     * 导出本地全量录音为标准 WAV 格式文件，并同步保存至系统公用下载目录
      */
     fun exportWavFile(customName: String? = null): File? {
         val samplesCopy: List<Short>
         synchronized(recordedSamples) {
-            if (recordedSamples.isEmpty()) return null
+            if (recordedSamples.isEmpty()) return lastExportedWavFile
             samplesCopy = recordedSamples.toList()
         }
 
-        val filename = customName ?: "voice_brain_${System.currentTimeMillis()}.wav"
-        val outputDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: context.filesDir
+        val filename = customName ?: "VoiceBrain_${System.currentTimeMillis()}.wav"
+        val outputDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
         val outputFile = File(outputDir, filename)
 
         try {
@@ -155,10 +188,45 @@ class AudioRecorderManager(
                 fos.write(byteBuffer.array())
             }
             Log.i(TAG, "WAV exported to ${outputFile.absolutePath} (${outputFile.length()} bytes)")
+            
+            // 同步写入系统公用 Downloads 目录，让用户在系统文件管理中能直接看到
+            saveToPublicDownloads(outputFile, filename)
+
+            lastExportedWavFile = outputFile
             return outputFile
         } catch (e: Exception) {
             Log.e(TAG, "Failed to export WAV file: ${e.message}", e)
             return null
+        }
+    }
+
+    private fun saveToPublicDownloads(sourceFile: File, filename: String) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "audio/wav")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                }
+                val resolver = context.contentResolver
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { os ->
+                        sourceFile.inputStream().use { input -> input.copyTo(os) }
+                    }
+                    Log.i(TAG, "WAV successfully synced to MediaStore.Downloads: $uri")
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val publicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (publicDir.exists() || publicDir.mkdirs()) {
+                    val publicFile = File(publicDir, filename)
+                    sourceFile.copyTo(publicFile, overwrite = true)
+                    Log.i(TAG, "WAV copied to public downloads: ${publicFile.absolutePath}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not save copy to public Downloads: ${e.message}")
         }
     }
 
@@ -199,11 +267,11 @@ class AudioRecorderManager(
         header[29] = (byteRate shr 8 and 0xff).toByte()
         header[30] = (byteRate shr 16 and 0xff).toByte()
         header[31] = (byteRate shr 24 and 0xff).toByte()
-        header[32] = (channels * (bitsPerSample / 8)).toByte() // block align
+        header[32] = (channels * bitsPerSample / 8).toByte() // block align
         header[33] = 0
         header[34] = bitsPerSample.toByte() // bits per sample
         header[35] = 0
-        header[36] = 'd'.code.toByte()
+        header[36] = 'd'.code.toByte() // 'data' chunk
         header[37] = 'a'.code.toByte()
         header[38] = 't'.code.toByte()
         header[39] = 'a'.code.toByte()
