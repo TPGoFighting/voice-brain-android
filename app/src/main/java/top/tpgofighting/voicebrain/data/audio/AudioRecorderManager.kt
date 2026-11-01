@@ -58,13 +58,24 @@ class AudioRecorderManager(
     fun start(): Boolean {
         if (isRecording) return true
 
-        val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
-        val bufferSize = if (minBufferSize > 0) maxOf(minBufferSize, CHUNK_SIZE_BYTES * 2) else CHUNK_SIZE_BYTES * 4
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.RECORD_AUDIO
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.e(TAG, "Cannot start recording: RECORD_AUDIO permission not granted")
+            return false
+        }
 
-        // 优先使用标准 MIC 源，若不初始化则兜底使用 VOICE_RECOGNITION
+        val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
+        val bufferSize = if (minBufferSize > 0) maxOf(minBufferSize, CHUNK_SIZE_BYTES * 4) else CHUNK_SIZE_BYTES * 4
+
+        // 优先使用标准系统默认源与麦克风源，若不初始化则逐级降级尝试
         val audioSources = listOf(
+            MediaRecorder.AudioSource.DEFAULT,
             MediaRecorder.AudioSource.MIC,
-            MediaRecorder.AudioSource.VOICE_RECOGNITION
+            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            MediaRecorder.AudioSource.VOICE_COMMUNICATION
         )
 
         var initializedRecord: AudioRecord? = null
@@ -79,7 +90,7 @@ class AudioRecorderManager(
                 )
                 if (record.state == AudioRecord.STATE_INITIALIZED) {
                     initializedRecord = record
-                    Log.i(TAG, "AudioRecord initialized successfully with source: $source")
+                    Log.i(TAG, "AudioRecord initialized successfully with source: $source, bufferSize: $bufferSize")
                     break
                 } else {
                     record.release()
@@ -106,41 +117,56 @@ class AudioRecorderManager(
             totalChunksSent = 0
 
             recordingJob = coroutineScope.launch {
-                val readBuffer = ShortArray(1600) // 100ms = 1600 shorts
-                val byteBuffer = ByteArray(CHUNK_SIZE_BYTES)
+                val readBuffer = ShortArray(1600) // 100ms = 1600 shorts (3200 bytes)
+                var logCount = 0
 
                 while (isActive && isRecording) {
-                    val readResult = audioRecord?.read(readBuffer, 0, readBuffer.size) ?: -1
+                    val record = audioRecord ?: break
+                    val readResult = record.read(readBuffer, 0, readBuffer.size)
                     if (readResult > 0) {
-                        // 1. 计算音量幅值 (RMS) 并缓存采样点
+                        // 1. 计算音量幅值 (RMS) 并线程安全缓存采样点
                         var sum = 0.0
-                        for (i in 0 until readResult) {
-                            val sample = readBuffer[i]
-                            sum += sample * sample
-                            synchronized(recordedSamples) {
+                        synchronized(recordedSamples) {
+                            for (i in 0 until readResult) {
+                                val sample = readBuffer[i]
+                                sum += sample * sample
                                 recordedSamples.add(sample)
                             }
                         }
                         val rms = sqrt(sum / readResult)
                         val normalizedVol = (rms / 32768.0f * 5.0f).coerceIn(0.0, 1.0).toFloat()
-                        withContext(Dispatchers.Main) {
+
+                        // 异步派发音量回调，绝不阻塞硬件音频读取循环
+                        coroutineScope.launch(Dispatchers.Main) {
                             onVolume(normalizedVol)
                         }
 
-                        // 2. 转为 16-bit Little-Endian 字节
-                        ByteBuffer.wrap(byteBuffer).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(readBuffer, 0, readResult)
-                        
-                        // 3. 必须生成独立字节副本，防止环形缓冲队列被下一帧覆写
-                        val chunkBytes = byteBuffer.copyOf(readResult * 2)
+                        // 2. 直接构造 16-bit Little-Endian 字节数组，杜绝 NIO 视图偏移异常
+                        val chunkBytes = ByteArray(readResult * 2)
+                        for (i in 0 until readResult) {
+                            val sample = readBuffer[i].toInt()
+                            chunkBytes[i * 2] = (sample and 0xFF).toByte()
+                            chunkBytes[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
+                        }
 
                         totalBytesSent += chunkBytes.size
                         totalChunksSent++
                         onChunk(chunkBytes)
+
+                        if (++logCount % 50 == 0) {
+                            Log.d(TAG, "ASR audio stream active: chunks=$totalChunksSent, bytes=$totalBytesSent, rms=${String.format("%.2f", rms)}")
+                        }
+                    } else {
+                        // 兜底保护：当底层返回 0 或负数错误码时休眠 20ms，防止 CPU 100% 紧凑死循环
+                        if (readResult < 0) {
+                            Log.w(TAG, "AudioRecord read returned error code: $readResult")
+                        }
+                        delay(20)
                     }
                 }
             }
 
-            Log.i(TAG, "Audio recording started successfully at 16000Hz")
+            Log.i(TAG, "Audio recording started successfully at 16000Hz mono")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error starting AudioRecord: ${e.message}", e)
@@ -203,13 +229,24 @@ class AudioRecorderManager(
     private fun saveToPublicDownloads(sourceFile: File, filename: String) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "audio/wav")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                }
+                val mimeTypes = listOf("audio/wav", "audio/x-wav", "audio/*")
+                var uri: android.net.Uri? = null
                 val resolver = context.contentResolver
-                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+
+                for (mime in mimeTypes) {
+                    try {
+                        val contentValues = ContentValues().apply {
+                            put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                            put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                        }
+                        uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                        if (uri != null) break
+                    } catch (e: Exception) {
+                        Log.w(TAG, "MediaStore insert failed for MIME $mime: ${e.message}")
+                    }
+                }
+
                 if (uri != null) {
                     resolver.openOutputStream(uri)?.use { os ->
                         sourceFile.inputStream().use { input -> input.copyTo(os) }

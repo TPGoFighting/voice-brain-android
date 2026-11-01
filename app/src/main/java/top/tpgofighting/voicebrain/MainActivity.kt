@@ -25,14 +25,20 @@ import java.io.File
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private var pendingStartRecordingAfterPermission = false
 
     private val requestAudioPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
             viewModel.showToast("已获取麦克风录音权限")
+            if (pendingStartRecordingAfterPermission) {
+                pendingStartRecordingAfterPermission = false
+                viewModel.startRecording()
+            }
         } else {
-            viewModel.showToast("需要麦克风权限才能进行实时流式语音转写")
+            pendingStartRecordingAfterPermission = false
+            viewModel.showToast("需要麦克风录音权限才能进行实时流式语音转写")
         }
     }
 
@@ -55,6 +61,10 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiEvents.collect { event ->
                     when (event) {
+                        is MainUiEvent.RequestAudioPermission -> {
+                            pendingStartRecordingAfterPermission = true
+                            requestAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
                         is MainUiEvent.ShareWavFile -> {
                             shareAudioFile(event.file)
                         }
@@ -72,7 +82,7 @@ class MainActivity : ComponentActivity() {
                 file
             )
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "audio/wav"
+                type = "audio/*"
                 putExtra(Intent.EXTRA_STREAM, contentUri)
                 putExtra(Intent.EXTRA_SUBJECT, "TP Voice Brain 录音导出: ${file.name}")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

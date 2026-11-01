@@ -55,6 +55,7 @@ data class MainUiState(
 )
 
 sealed class MainUiEvent {
+    object RequestAudioPermission : MainUiEvent()
     data class ShareWavFile(val file: File, val message: String) : MainUiEvent()
 }
 
@@ -152,6 +153,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startRecording() {
         if (_uiState.value.isRecording) return
+
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                getApplication(),
+                android.Manifest.permission.RECORD_AUDIO
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModelScope.launch {
+                _uiEvents.emit(MainUiEvent.RequestAudioPermission)
+            }
+            return
+        }
 
         _uiState.update {
             it.copy(
