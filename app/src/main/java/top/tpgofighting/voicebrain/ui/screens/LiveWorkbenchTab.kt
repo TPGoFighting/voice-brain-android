@@ -31,7 +31,8 @@ fun LiveWorkbenchTab(
     state: MainUiState,
     onToggleRecord: () -> Unit,
     onExportWav: () -> Unit,
-    onGenerateMinutes: () -> Unit
+    onGenerateMinutes: () -> Unit,
+    onSetSilence: (Int) -> Unit = {}
 ) {
     val listState = rememberLazyListState()
 
@@ -113,6 +114,52 @@ fun LiveWorkbenchTab(
             )
 
             Spacer(modifier = Modifier.height(6.dp))
+
+            // 断句停顿判定 (500ms 紧凑 / 800ms 标准 / 1200ms 从容)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "断句停顿:",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                listOf(
+                    500 to "500ms 紧凑",
+                    800 to "800ms 标准",
+                    1200 to "1200ms 从容"
+                ).forEach { (ms, label) ->
+                    val isSelected = state.sentenceSilenceMs == ms
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .border(
+                                1.dp,
+                                if (isSelected) TPNavyDark else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                RoundedCornerShape(6.dp)
+                            )
+                            .background(if (isSelected) TPMustardYellow else MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { onSetSilence(ms) }
+                            .padding(vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                            color = if (isSelected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
 
             // PCM 统计与无损导出
             Row(

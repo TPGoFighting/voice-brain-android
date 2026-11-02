@@ -21,6 +21,7 @@ sealed class AsrEvent {
 
 class AsrWebSocketManager(
     private val serverUrl: String = "wss://voice.tpgofighting.top/ws/asr",
+    private var sentenceSilenceMs: Int = 800,
     private val onEvent: (AsrEvent) -> Unit
 ) {
     companion object {
@@ -54,13 +55,20 @@ class AsrWebSocketManager(
         startPingTimer()
     }
 
+    fun updateSentenceSilence(silenceMs: Int) {
+        sentenceSilenceMs = silenceMs
+        if (isConnected && webSocket != null) {
+            webSocket?.send("""{"type":"config","maxSentenceSilence":$silenceMs}""")
+        }
+    }
+
     private fun connect() {
         val request = Request.Builder().url(serverUrl).build()
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 Log.i(TAG, "WebSocket connected to $serverUrl")
                 isConnected = true
-                ws.send("""{"type":"start"}""")
+                ws.send("""{"type":"start","maxSentenceSilence":$sentenceSilenceMs}""")
 
                 // 冲刷缓冲的 PCM 队列
                 flushBuffer()

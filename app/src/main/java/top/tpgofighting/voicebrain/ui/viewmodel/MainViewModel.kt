@@ -25,6 +25,7 @@ data class MainUiState(
     val totalFrames: Long = 0,
     val totalBytes: Long = 0,
     val exportedWavFile: File? = null,
+    val sentenceSilenceMs: Int = 800,
 
     // 纪要决策与人设 (Tier 3)
     val currentPersona: Persona = Persona.DEFAULT,
@@ -185,7 +186,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // 启动 WebSocket
-        webSocketManager = AsrWebSocketManager { event ->
+        webSocketManager = AsrWebSocketManager(
+            sentenceSilenceMs = _uiState.value.sentenceSilenceMs
+        ) { event ->
             handleAsrEvent(event)
         }
         webSocketManager?.start()
@@ -315,6 +318,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             showToast("当前暂无录音音频数据，请先录制一段语音")
         }
         return file
+    }
+
+    fun setSentenceSilence(silenceMs: Int) {
+        _uiState.update { it.copy(sentenceSilenceMs = silenceMs) }
+        webSocketManager?.updateSentenceSilence(silenceMs)
+        val label = when (silenceMs) {
+            500 -> "紧凑 (500ms)"
+            1200 -> "从容 (1200ms)"
+            else -> "标准 (800ms)"
+        }
+        showToast("已设置断句判定: $label")
     }
 
     fun selectPersona(persona: Persona) {

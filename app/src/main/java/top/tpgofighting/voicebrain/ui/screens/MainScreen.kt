@@ -128,7 +128,8 @@ fun MainScreen(viewModel: MainViewModel) {
                         onGenerateMinutes = {
                             viewModel.generateMinutes()
                             currentTab = NavigationTab.MINUTES
-                        }
+                        },
+                        onSetSilence = { viewModel.setSentenceSilence(it) }
                     )
                 }
                 NavigationTab.MINUTES -> {
