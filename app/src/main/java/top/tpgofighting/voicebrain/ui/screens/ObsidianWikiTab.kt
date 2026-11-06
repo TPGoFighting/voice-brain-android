@@ -33,6 +33,7 @@ fun ObsidianWikiTab(
 ) {
     var queryText by remember { mutableStateOf("") }
     var selectedSection by remember { mutableStateOf(0) } // 0: Hermes问答对账, 1: 笔记与实体网络
+    var showVaultPath by remember { mutableStateOf(false) } // 服务器绝对路径默认不展示，点按才展开
 
     // 进入本页时若状态尚未加载成功（如启动时离线），自动重试一次
     LaunchedEffect(state.obsidianStatus.loaded) {
@@ -70,11 +71,16 @@ fun ObsidianWikiTab(
             }
 
             Spacer(modifier = Modifier.height(4.dp))
+            // 默认只说人话；服务器绝对路径是部署细节，点按这一行才展开查看
+            val pathVisible = showVaultPath && state.obsidianStatus.vaultPath.isNotBlank()
             Text(
-                text = state.obsidianStatus.vaultPath,
-                fontSize = 9.sp,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = if (pathVisible) state.obsidianStatus.vaultPath else "我的 Obsidian 仓库 · 与服务器实时同步",
+                fontSize = if (pathVisible) 9.sp else 10.sp,
+                fontFamily = if (pathVisible) FontFamily.Monospace else FontFamily.Default,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clickable(
+                    enabled = state.obsidianStatus.loaded && state.obsidianStatus.vaultPath.isNotBlank()
+                ) { showVaultPath = !showVaultPath }
             )
 
             Spacer(modifier = Modifier.height(6.dp))
