@@ -127,7 +127,7 @@ fun ObsidianWikiTab(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                 .padding(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -207,7 +207,7 @@ fun ObsidianWikiTab(
                     OutlinedTextField(
                         value = queryText,
                         onValueChange = { queryText = it },
-                        modifier = Modifier.weight(1f).height(46.dp),
+                        modifier = Modifier.weight(1f).height(52.dp),
                         placeholder = { Text("查仓库笔记，如：点云论文笔记在哪", fontSize = 11.sp) },
                         shape = RoundedCornerShape(8.dp),
                         singleLine = true

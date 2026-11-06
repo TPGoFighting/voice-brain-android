@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,11 +25,12 @@ import top.tpgofighting.voicebrain.ui.theme.TPMustardYellow
 import top.tpgofighting.voicebrain.ui.theme.TPNavyDark
 import top.tpgofighting.voicebrain.ui.viewmodel.MainViewModel
 
+// 主导航图标统一用线性（Outlined）风格，与 TP 的线绘设计语言一致，不用实心图标
 enum class NavigationTab(val label: String, val icon: ImageVector) {
-    LIVE("实时录音", Icons.Filled.Mic),
-    MINUTES("纪要决策", Icons.Filled.Article),
-    MEMORY("记忆大脑", Icons.Filled.Psychology),
-    OBSIDIAN("Obsidian", Icons.Filled.Hub)
+    LIVE("实时录音", Icons.Outlined.Mic),
+    MINUTES("纪要决策", Icons.Outlined.Article),
+    MEMORY("记忆大脑", Icons.Outlined.Psychology),
+    OBSIDIAN("Obsidian", Icons.Outlined.Hub)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,13 +65,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         TPBadge(text = uiState.currentPersona.badge, variant = TPBadgeVariant.YELLOW)
                     }
                 },
-                actions = {
-                    TPBadge(
-                        text = "${uiState.memories.size} 条记忆",
-                        variant = TPBadgeVariant.BLUE,
-                        modifier = Modifier.padding(end = 12.dp)
-                    )
-                },
+                // 顶栏不再放「N 条记忆」计数：与记忆页的计数重复，属于噪音
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground

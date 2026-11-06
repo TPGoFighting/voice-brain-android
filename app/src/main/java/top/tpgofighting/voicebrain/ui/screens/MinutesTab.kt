@@ -115,7 +115,7 @@ fun MinutesTab(
                         if (state.isGeneratingMinutes) {
                             CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp, color = TPNavyDark)
                         } else {
-                            Text("重新提炼", fontSize = 10.sp, fontWeight = FontWeight.Black)
+                            Text(if (state.minutes == null) "生成纪要" else "重新生成", fontSize = 10.sp, fontWeight = FontWeight.Black)
                         }
                     }
                 }
@@ -198,7 +198,7 @@ fun MinutesTab(
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
-                Text("结构化纪要与决策对账", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("纪要与决策", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
 
             Button(
@@ -211,7 +211,7 @@ fun MinutesTab(
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
-                Text("排版润色正式稿", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("正式成稿", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -260,7 +260,7 @@ fun MinutesTab(
                 } else if (state.polishedDraft.isBlank()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Button(onClick = onPolishDraft) {
-                            Text("点击生成排版润色正式稿")
+                            Text("点击生成正式成稿")
                         }
                     }
                 } else {
@@ -316,7 +316,7 @@ fun MinutesTab(
                             Spacer(modifier = Modifier.height(6.dp))
                             val items = minutes?.tldr ?: emptyList()
                             if (items.isEmpty()) {
-                                Text("尚未生成纪要，点上方「重新提炼」生成", fontSize = 11.sp, color = Color.Gray)
+                                Text("尚未生成纪要，点上方「生成纪要」", fontSize = 11.sp, color = Color.Gray)
                             }
                             items.forEach { t ->
                                 Row(modifier = Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {

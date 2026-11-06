@@ -32,8 +32,9 @@ enum class TPBadgeVariant {
 fun TPCard(
     modifier: Modifier = Modifier,
     backgroundColor: Color = MaterialTheme.colorScheme.surface,
-    borderColor: Color = MaterialTheme.colorScheme.outline,
-    borderWidth: Dp = 1.5.dp,
+    // 非交互容器只给一层淡描边定界，重描边留给可交互元素（VI 的新丑风描边语义）
+    borderColor: Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+    borderWidth: Dp = 1.dp,
     elevation: Dp = 2.dp,
     cornerRadius: Dp = 10.dp,
     content: @Composable ColumnScope.() -> Unit
