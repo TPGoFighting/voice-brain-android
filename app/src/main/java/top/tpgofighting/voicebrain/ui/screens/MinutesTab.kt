@@ -36,7 +36,8 @@ fun MinutesTab(
     onGenerateMinutes: () -> Unit,
     onToggleViewMode: (Boolean) -> Unit,
     onPolishDraft: () -> Unit,
-    onShowToast: (String) -> Unit
+    onShowToast: (String) -> Unit,
+    onSetTemplate: (String) -> Unit = {}
 ) {
     var showPersonaBottomSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -127,6 +128,55 @@ fun MinutesTab(
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            // 纪要场景模板（与服务端 MINUTES_TEMPLATES 对齐：通用/会议/课程/访谈）
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "模板:",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                top.tpgofighting.voicebrain.model.MINUTES_TEMPLATES.forEach { tpl ->
+                    val isSelected = state.minutesTemplate == tpl.id
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .border(
+                                1.dp,
+                                if (isSelected) TPNavyDark else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                RoundedCornerShape(6.dp)
+                            )
+                            .background(if (isSelected) TPMustardYellow else MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { onSetTemplate(tpl.id) }
+                            .padding(vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = tpl.label,
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                            color = if (isSelected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            val currentTpl = top.tpgofighting.voicebrain.model.MINUTES_TEMPLATES
+                .firstOrNull { it.id == state.minutesTemplate }
+            if (currentTpl != null) {
+                Text(
+                    text = currentTpl.hint,
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+            }
         }
 
         // 2. 双视图切换器 (结构化纪要 VS 排版润色正式稿)
@@ -236,6 +286,26 @@ fun MinutesTab(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // 纪要标题与模板标识
+                    if (minutes != null) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = minutes.title,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TPBadge(text = "${minutes.templateLabel}模板", variant = TPBadgeVariant.YELLOW)
+                                TPBadge(text = minutes.date, variant = TPBadgeVariant.OUTLINE)
+                            }
+                        }
+                    }
+
                     // 30s TL;DR
                     item {
                         TPCard(modifier = Modifier.fillMaxWidth()) {
@@ -244,7 +314,10 @@ fun MinutesTab(
                                 Text("30秒高管速览 (TL;DR)", fontSize = 13.sp, fontWeight = FontWeight.Black)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
-                            val items = minutes?.tldr ?: listOf("完成全双工语音链路与 Obsidian 知识库融合研讨", "敲定断线自动重连与环形缓冲协议", "开启静默自动沉淀第二大脑记忆")
+                            val items = minutes?.tldr ?: emptyList()
+                            if (items.isEmpty()) {
+                                Text("尚未生成纪要，点上方「重新提炼」生成", fontSize = 11.sp, color = Color.Gray)
+                            }
                             items.forEach { t ->
                                 Row(modifier = Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {
                                     Text("•", fontWeight = FontWeight.Bold, color = TPMustardYellowDark, modifier = Modifier.padding(end = 6.dp))
@@ -262,7 +335,10 @@ fun MinutesTab(
                                 Text("明确敲定的关键决议 (Decisions)", fontSize = 13.sp, fontWeight = FontWeight.Black)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
-                            val decs = minutes?.decisions ?: listOf("认可单任务 Agent 已跨越基础可用门槛", "判断 Personal Agent 核心形态是持续在线与事件驱动", "指出现有单一 Session 模式是规模化协作瓶颈")
+                            val decs = minutes?.decisions ?: emptyList()
+                            if (decs.isEmpty() && minutes != null) {
+                                Text("本次纪要未提炼出明确决议", fontSize = 11.sp, color = Color.Gray)
+                            }
                             decs.forEachIndexed { idx, d ->
                                 Row(modifier = Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.Top) {
                                     TPBadge(text = "${idx + 1}", variant = TPBadgeVariant.BLUE)
@@ -281,11 +357,10 @@ fun MinutesTab(
                                 Text("落地行动项 (Action Items)", fontSize = 13.sp, fontWeight = FontWeight.Black)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
-                            val todos = minutes?.actionItems ?: listOf(
-                                ActionItem("1", "设计跨 Session 共享记忆与事件总线最小原型", "系统架构师", "P0", "pending"),
-                                ActionItem("2", "梳理 Personal Agent 接入消息与工作平台的权限边界", "敏捷交付", "P1", "pending"),
-                                ActionItem("3", "定义人机协作决策-验收审计日志与溯源协议", "认知冥想者", "P1", "pending")
-                            )
+                            val todos = minutes?.actionItems ?: emptyList()
+                            if (todos.isEmpty() && minutes != null) {
+                                Text("本次纪要未提炼出行动项", fontSize = 11.sp, color = Color.Gray)
+                            }
                             todos.forEach { todo ->
                                 Row(
                                     modifier = Modifier

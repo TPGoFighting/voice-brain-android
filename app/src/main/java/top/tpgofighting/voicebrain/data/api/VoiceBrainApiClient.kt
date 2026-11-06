@@ -8,7 +8,22 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import top.tpgofighting.voicebrain.model.*
+import java.io.File
 import java.util.concurrent.TimeUnit
+
+/** 问答结果：答案正文 + 真实引用来源（服务端检索命中的原文片段） */
+data class BrainAnswer(
+    val answer: String,
+    val sources: List<BrainSource> = emptyList()
+)
+
+/** 说话人分离的一句（离线精转写） */
+data class DiarizedSentence(
+    val beginMs: Long,
+    val endMs: Long,
+    val speakerId: Int,
+    val text: String
+)
 
 class VoiceBrainApiClient(
     private val baseUrl: String = "https://voice.tpgofighting.top"
@@ -24,14 +39,24 @@ class VoiceBrainApiClient(
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    // 流式问答专用：读超时放宽，逐行消费 SSE
+    private val streamClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
+
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
-     * 生成结构化纪要与决策对账
+     * 生成结构化纪要（v1.1.0 契约对齐：请求发 persona/template/sessionId，
+     * 响应从 data 层解析，未决事项读 unresolved_risks）
      */
     suspend fun generateMinutes(
         utterances: List<Utterance>,
         persona: Persona,
+        template: String = "general",
+        sessionId: String? = null,
         customTitle: String? = null
     ): Result<Minutes> = withContext(Dispatchers.IO) {
         try {
@@ -41,15 +66,19 @@ class VoiceBrainApiClient(
                         put("id", u.id)
                         put("speaker", u.speaker)
                         put("time", u.time)
-                        put("text", u.text)
+                        put("text", u.rawText.ifBlank { u.text })
+                        put("rawText", u.rawText.ifBlank { u.text })
+                        if (!u.cleansedText.isNullOrBlank()) put("displayText", u.cleansedText)
                     })
                 }
             }
 
             val bodyJson = buildJsonObject {
                 put("utterances", uttArray)
-                put("personaId", persona.id)
-                put("customTitle", customTitle ?: "移动端语音纪要")
+                put("persona", persona.id)
+                put("template", template)
+                if (sessionId != null) put("sessionId", sessionId)
+                if (customTitle != null) put("customTitle", customTitle)
             }.toString()
 
             val request = Request.Builder()
@@ -63,7 +92,8 @@ class VoiceBrainApiClient(
                 return@withContext Result.failure(Exception("HTTP ${response.code}: $respBody"))
             }
 
-            val obj = json.parseToJsonElement(respBody).jsonObject
+            val root = json.parseToJsonElement(respBody).jsonObject
+            val obj = root["data"]?.jsonObject ?: root
             val title = obj["title"]?.jsonPrimitive?.content ?: customTitle ?: "语音纪要"
             val tldr = obj["tldr"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
             val decisions = obj["decisions"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
@@ -77,8 +107,12 @@ class VoiceBrainApiClient(
                     status = itemObj["status"]?.jsonPrimitive?.content ?: "pending"
                 )
             } ?: emptyList()
-            val unresolved = obj["unresolved_questions"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+            val unresolved = (obj["unresolved_risks"] ?: obj["unresolved_questions"])?.jsonArray
+                ?.map { it.jsonPrimitive.content } ?: emptyList()
             val mindmap = obj["mindmap_markdown"]?.jsonPrimitive?.content ?: ""
+            val respTemplate = obj["template"]?.jsonPrimitive?.content ?: template
+            val respTemplateLabel = obj["templateLabel"]?.jsonPrimitive?.content
+                ?: MINUTES_TEMPLATES.firstOrNull { it.id == respTemplate }?.label ?: "通用"
 
             Result.success(
                 Minutes(
@@ -91,7 +125,9 @@ class VoiceBrainApiClient(
                     decisions = decisions,
                     actionItems = actionItems,
                     unresolvedQuestions = unresolved,
-                    mindmapMarkdown = mindmap
+                    mindmapMarkdown = mindmap,
+                    template = respTemplate,
+                    templateLabel = respTemplateLabel
                 )
             )
         } catch (e: Exception) {
@@ -166,9 +202,9 @@ class VoiceBrainApiClient(
     }
 
     /**
-     * 问问你的第二大脑 (Ask Your Second Brain)
+     * 问问第二大脑（非流式，流式失败时兜底）
      */
-    suspend fun querySecondBrain(question: String): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun querySecondBrain(question: String): Result<BrainAnswer> = withContext(Dispatchers.IO) {
         try {
             val bodyJson = buildJsonObject {
                 put("question", question)
@@ -186,10 +222,253 @@ class VoiceBrainApiClient(
             }
 
             val obj = json.parseToJsonElement(respBody).jsonObject
-            val answer = obj["answer"]?.jsonPrimitive?.content ?: "未能查询到对应记忆"
-            Result.success(answer)
+            Result.success(parseBrainAnswer(obj))
         } catch (e: Exception) {
             Log.e(TAG, "querySecondBrain failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 问问第二大脑（流式 SSE）：delta 逐字回调，final 事件带真实来源。
+     * 流在首字前失败会抛异常，调用方回退非流式接口。
+     */
+    suspend fun querySecondBrainStream(
+        question: String,
+        onDelta: (String) -> Unit
+    ): Result<BrainAnswer> = withContext(Dispatchers.IO) {
+        try {
+            val bodyJson = buildJsonObject {
+                put("question", question)
+            }.toString()
+
+            val request = Request.Builder()
+                .url("$baseUrl/api/memory/query/stream")
+                .header("Accept", "text/event-stream")
+                .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            val response = streamClient.newCall(request).execute()
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}"))
+            }
+            val source = response.body?.source()
+                ?: return@withContext Result.failure(Exception("流式响应为空"))
+
+            var finalAnswer: BrainAnswer? = null
+            var sawDelta = false
+            while (!source.exhausted()) {
+                val line = source.readUtf8Line() ?: break
+                if (!line.startsWith("data:")) continue
+                val payload = line.removePrefix("data:").trim()
+                if (payload.isEmpty() || payload == "[DONE]") continue
+                val evt = try {
+                    json.parseToJsonElement(payload).jsonObject
+                } catch (e: Exception) {
+                    continue
+                }
+                when (evt["type"]?.jsonPrimitive?.content) {
+                    "delta" -> {
+                        val text = evt["text"]?.jsonPrimitive?.content ?: ""
+                        if (text.isNotEmpty()) {
+                            sawDelta = true
+                            withContext(Dispatchers.Main) { onDelta(text) }
+                        }
+                    }
+                    "final" -> {
+                        finalAnswer = parseBrainAnswer(evt)
+                    }
+                    "error" -> {
+                        val msg = evt["message"]?.jsonPrimitive?.content ?: "流式问答出错"
+                        if (!sawDelta) return@withContext Result.failure(Exception(msg))
+                    }
+                }
+            }
+            val answer = finalAnswer
+                ?: return@withContext Result.failure(Exception("流式问答未收到 final 事件"))
+            Result.success(answer)
+        } catch (e: Exception) {
+            Log.e(TAG, "querySecondBrainStream failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    private fun parseBrainAnswer(obj: JsonObject): BrainAnswer {
+        val answer = obj["answer"]?.jsonPrimitive?.content ?: "未能查询到对应记忆"
+        val sources = obj["sources"]?.jsonArray?.map { s ->
+            val so = s.jsonObject
+            BrainSource(
+                sessionId = so["sessionId"]?.jsonPrimitive?.content ?: "",
+                sessionTitle = so["sessionTitle"]?.jsonPrimitive?.content ?: "",
+                text = so["text"]?.jsonPrimitive?.content ?: ""
+            )
+        } ?: emptyList()
+        return BrainAnswer(answer = answer, sources = sources)
+    }
+
+    /**
+     * 全文检索（GET /api/search）：逐字稿原文 + 长期记忆
+     */
+    suspend fun search(query: String, limit: Int = 30): Result<List<SearchHit>> = withContext(Dispatchers.IO) {
+        try {
+            val url = "$baseUrl/api/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}&limit=$limit"
+            val request = Request.Builder().url(url).get().build()
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}"))
+            }
+            val obj = json.parseToJsonElement(respBody).jsonObject
+            val hits = obj["results"]?.jsonArray?.map { h ->
+                val ho = h.jsonObject
+                SearchHit(
+                    kind = ho["kind"]?.jsonPrimitive?.content ?: "transcript",
+                    sessionId = ho["sessionId"]?.jsonPrimitive?.content ?: "",
+                    sessionTitle = ho["sessionTitle"]?.jsonPrimitive?.content ?: "",
+                    stamp = ho["stamp"]?.jsonPrimitive?.content ?: "",
+                    text = ho["text"]?.jsonPrimitive?.content ?: "",
+                    category = ho["category"]?.jsonPrimitive?.content ?: ""
+                )
+            } ?: emptyList()
+            Result.success(hits)
+        } catch (e: Exception) {
+            Log.e(TAG, "search failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /** 历史会话列表（GET /api/sessions 返回裸数组） */
+    suspend fun fetchSessions(): Result<List<SessionSummary>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("$baseUrl/api/sessions").get().build()
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}"))
+            }
+            val arr = json.parseToJsonElement(respBody).jsonArray
+            val list = arr.map { s ->
+                val so = s.jsonObject
+                val utterances = so["utterances"]?.jsonArray
+                SessionSummary(
+                    id = so["id"]?.jsonPrimitive?.content ?: "",
+                    title = so["title"]?.jsonPrimitive?.content ?: so["topic"]?.jsonPrimitive?.content ?: "未命名会话",
+                    stamp = so["createdAt"]?.jsonPrimitive?.content ?: "",
+                    utteranceCount = utterances?.size ?: 0
+                )
+            }.filter { it.id.isNotBlank() }
+            Result.success(list)
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchSessions failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /** 读取单个历史会话的逐字稿 */
+    suspend fun fetchSession(sessionId: String): Result<List<Utterance>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("$baseUrl/api/sessions/$sessionId").get().build()
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}"))
+            }
+            val so = json.parseToJsonElement(respBody).jsonObject
+            val utterances = so["utterances"]?.jsonArray?.mapIndexed { idx, u ->
+                val uo = u.jsonObject
+                val raw = uo["rawText"]?.jsonPrimitive?.content ?: uo["text"]?.jsonPrimitive?.content ?: ""
+                Utterance(
+                    id = uo["id"]?.jsonPrimitive?.intOrNull ?: (idx + 1),
+                    sentenceId = uo["sentenceId"]?.jsonPrimitive?.content ?: "sess-$idx",
+                    speaker = uo["speaker"]?.jsonPrimitive?.content ?: "发言人",
+                    time = uo["time"]?.jsonPrimitive?.content ?: "",
+                    text = raw,
+                    rawText = raw,
+                    isCleansed = uo["isCleansed"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    cleansedText = uo["displayText"]?.jsonPrimitive?.content,
+                    beginMs = uo["begin_time"]?.jsonPrimitive?.longOrNull ?: 0L
+                )
+            } ?: emptyList()
+            Result.success(utterances)
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchSession failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    // ---------- 说话人分离（离线精转写 paraformer-v2 + diarization） ----------
+
+    suspend fun diarizeUpload(wav: File): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val body = wav.readBytes().toRequestBody("audio/wav".toMediaType())
+            val request = Request.Builder()
+                .url("$baseUrl/api/asr/diarize/upload")
+                .post(body)
+                .build()
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}: $respBody"))
+            }
+            val obj = json.parseToJsonElement(respBody).jsonObject
+            val audioId = obj["audioId"]?.jsonPrimitive?.content
+                ?: return@withContext Result.failure(Exception("上传响应缺少 audioId"))
+            Result.success(audioId)
+        } catch (e: Exception) {
+            Log.e(TAG, "diarizeUpload failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun diarizeStart(audioId: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val bodyJson = buildJsonObject { put("audioId", audioId) }.toString()
+            val request = Request.Builder()
+                .url("$baseUrl/api/asr/diarize/start")
+                .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}: $respBody"))
+            }
+            val obj = json.parseToJsonElement(respBody).jsonObject
+            val taskId = obj["taskId"]?.jsonPrimitive?.content
+                ?: return@withContext Result.failure(Exception("启动响应缺少 taskId"))
+            Result.success(taskId)
+        } catch (e: Exception) {
+            Log.e(TAG, "diarizeStart failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /** 返回 Pair(状态, 句子列表)；状态为 RUNNING 时句子为空 */
+    suspend fun diarizeStatus(taskId: String): Result<Pair<String, List<DiarizedSentence>>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder().url("$baseUrl/api/asr/diarize/status/$taskId").get().build()
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}: $respBody"))
+            }
+            val obj = json.parseToJsonElement(respBody).jsonObject
+            val status = obj["status"]?.jsonPrimitive?.content ?: "UNKNOWN"
+            if (status == "FAILED") {
+                val msg = obj["message"]?.jsonPrimitive?.content ?: "精转写失败"
+                return@withContext Result.failure(Exception(msg))
+            }
+            val sentences = obj["sentences"]?.jsonArray?.map { s ->
+                val so = s.jsonObject
+                DiarizedSentence(
+                    beginMs = so["beginMs"]?.jsonPrimitive?.longOrNull ?: 0L,
+                    endMs = so["endMs"]?.jsonPrimitive?.longOrNull ?: 0L,
+                    speakerId = so["speakerId"]?.jsonPrimitive?.intOrNull ?: 0,
+                    text = so["text"]?.jsonPrimitive?.content ?: ""
+                )
+            } ?: emptyList()
+            Result.success(Pair(status, sentences))
+        } catch (e: Exception) {
+            Log.e(TAG, "diarizeStatus failed: ${e.message}", e)
             Result.failure(e)
         }
     }

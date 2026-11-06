@@ -1,7 +1,9 @@
 package top.tpgofighting.voicebrain.ui.viewmodel
 
 import android.app.Application
+import android.content.Intent
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
@@ -11,6 +13,9 @@ import top.tpgofighting.voicebrain.data.audio.AudioRecorderManager
 import top.tpgofighting.voicebrain.data.websocket.AsrEvent
 import top.tpgofighting.voicebrain.data.websocket.AsrWebSocketManager
 import top.tpgofighting.voicebrain.model.*
+import top.tpgofighting.voicebrain.service.KeepAliveHelper
+import top.tpgofighting.voicebrain.service.RecordingBus
+import top.tpgofighting.voicebrain.service.RecordingService
 import java.io.File
 
 data class MainUiState(
@@ -18,6 +23,7 @@ data class MainUiState(
     val isRecording: Boolean = false,
     val recordDurationSeconds: Int = 0,
     val currentVolume: Float = 0f,
+    val volumeHistory: List<Float> = emptyList(),
     val wsStatusText: String = "未连接",
     val wsStatusConnected: Boolean = false,
     val interimText: String = "",
@@ -25,15 +31,33 @@ data class MainUiState(
     val totalFrames: Long = 0,
     val totalBytes: Long = 0,
     val exportedWavFile: File? = null,
-    val sentenceSilenceMs: Int = 800,
+    val sentenceSilenceMs: Int = 1200,
+
+    // 输入设备（DJI Mic Mini 接收器等外接麦克风）
+    val audioDevices: List<AudioInputDevice> = emptyList(),
+    val selectedDeviceId: Int? = null, // null = 自动优选
+    val activeDeviceLabel: String = "手机内置麦克风",
+
+    // 逐字稿展示：默认原文，清洗稿单独切换（与 Web Fix 2 对齐）
+    val showCleansed: Boolean = false,
+
+    // 历史会话归档
+    val sessions: List<SessionSummary> = emptyList(),
+    val isLoadingSessions: Boolean = false,
+    val viewingSessionTitle: String? = null,
 
     // 纪要决策与人设 (Tier 3)
     val currentPersona: Persona = Persona.DEFAULT,
+    val minutesTemplate: String = "general",
     val minutes: Minutes? = null,
     val isGeneratingMinutes: Boolean = false,
     val isMinutesPolishView: Boolean = false,
     val polishedDraft: String = "",
     val isPolishing: Boolean = false,
+
+    // 说话人分离
+    val isDiarizing: Boolean = false,
+    val diarizeStatus: String = "",
 
     // 长期第二大脑记忆库
     val memories: List<MemoryItem> = emptyList(),
@@ -41,7 +65,13 @@ data class MainUiState(
     val memorySearchQuery: String = "",
     val brainChatHistory: List<BrainChatMessage> = emptyList(),
     val isBrainThinking: Boolean = false,
-    val memorySubTab: Int = 0, // 0: 记忆库卡片, 1: 问问第二大脑 Agent
+    val memorySubTab: Int = 0, // 0: 记忆库卡片, 1: 问问第二大脑, 2: 全文检索
+
+    // 全文检索
+    val searchQuery: String = "",
+    val searchHits: List<SearchHit> = emptyList(),
+    val isSearching: Boolean = false,
+    val searchDone: Boolean = false,
 
     // Obsidian 知识库与 Hermes 联动
     val obsidianStatus: ObsidianStatus = ObsidianStatus(),
@@ -50,6 +80,9 @@ data class MainUiState(
     val obsidianChatHistory: List<BrainChatMessage> = emptyList(),
     val isObsidianThinking: Boolean = false,
     val autoWriteBackEnabled: Boolean = true,
+
+    // 后台保活状态
+    val batteryExempt: Boolean = true,
 
     // 全局提示信息 (Toast / Banner)
     val toastMessage: String? = null
@@ -63,6 +96,7 @@ sealed class MainUiEvent {
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "MainViewModel"
+        private const val VOLUME_HISTORY_MAX = 48
     }
 
     private val apiClient = VoiceBrainApiClient()
@@ -78,51 +112,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var timerJob: Job? = null
 
     init {
-        initDefaultData()
+        initWelcomeMessages()
         fetchRemoteData()
+        refreshAudioDevices()
+        refreshBatteryState()
     }
 
-    private fun initDefaultData() {
+    private fun initWelcomeMessages() {
         _uiState.update { state ->
             state.copy(
-                memories = listOf(
-                    MemoryItem(
-                        id = "mem-1",
-                        category = "preference",
-                        content = "语音交互优先追求极速跟手感，句级快修控制在 500ms 内，单页式 100dvh 防全局滚动，排版必须符合 TP 品牌规范。",
-                        tags = listOf("架构设计", "交互原则", "TP品牌"),
-                        importance = 5
-                    ),
-                    MemoryItem(
-                        id = "mem-2",
-                        category = "project",
-                        content = "TP Voice Brain 架构演进：第一层 fun-asr-realtime 感知层，第二层 qwen-flash 交互层，第三层 deepseek-flash 认知沉淀。",
-                        tags = listOf("全双工语音", "分层架构", "DeepSeek"),
-                        importance = 5
-                    ),
-                    MemoryItem(
-                        id = "mem-3",
-                        category = "decision",
-                        content = "拆掉单一 Session 围墙，将录音材料无缝同步至 Obsidian Vault 并构建 LMMWiki 双链图谱与 Hermes 思考反向追记闭环。",
-                        tags = listOf("PersonalAgent", "Obsidian", "Hermes"),
-                        importance = 5
-                    )
-                ),
-                obsidianEntities = listOf(
-                    LmmWikiEntity("Personal Agent", "持续在线、事件驱动、深度接入个人工作流与第二大脑的常驻智能体", "概念"),
-                    LmmWikiEntity("单一Session模式", "传统Agent以独立Session为单位的架构局限，阻碍多任务协同规模化", "架构瓶颈"),
-                    LmmWikiEntity("Session Mesh", "将上下文与状态外置于总线的可编排临时会话调度架构", "蓝海方案"),
-                    LmmWikiEntity("Hermes Agent", "具备自主规划与反向追记能力的本地知识库推理智能体", "执行引擎")
-                ),
-                obsidianNotes = listOf(
-                    ObsidianNote("01-Raw/录音材料/2026-11/2026-11-02-拆掉Session围墙.md", "拆掉Session围墙：Personal Agent涌现与协作拐点", "2026-11-02", "灵感探险家", listOf("知识库", "语音纪要")),
-                    ObsidianNote("01-Raw/录音材料/2026-11/2026-11-01-全双工架构研讨.md", "全双工语音架构与反向追记闭环研讨", "2026-11-01", "系统架构师", listOf("架构设计", "全双工"))
-                ),
                 brainChatHistory = listOf(
                     BrainChatMessage(
                         id = "bc-0",
                         isUser = false,
-                        content = "你好！我是你的个人第二大脑助手。我已经载入了你的长期记忆库与历史会话，你可以随时问我任何过去讨论过的方案或决策。",
+                        content = "你好！我是你的个人第二大脑助手。我已经接入你的长期记忆库与全部历史录音，问答会逐字引用原文出处，你可以随时问我过去讨论过的方案或决策。",
                         timestamp = "刚刚"
                     )
                 ),
@@ -141,15 +144,66 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun fetchRemoteData() {
         viewModelScope.launch {
             val memRes = apiClient.fetchMemories()
-            if (memRes.isSuccess && !memRes.getOrNull().isNullOrEmpty()) {
-                _uiState.update { it.copy(memories = memRes.getOrNull()!!) }
+            if (memRes.isSuccess) {
+                _uiState.update { it.copy(memories = memRes.getOrNull() ?: emptyList()) }
             }
 
             val obsRes = apiClient.fetchObsidianStatus()
             if (obsRes.isSuccess) {
                 _uiState.update { it.copy(obsidianStatus = obsRes.getOrNull()!!) }
             }
+
+            refreshSessions()
         }
+    }
+
+    fun refreshSessions() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingSessions = true) }
+            val res = apiClient.fetchSessions()
+            _uiState.update {
+                it.copy(
+                    sessions = res.getOrNull() ?: it.sessions,
+                    isLoadingSessions = false
+                )
+            }
+        }
+    }
+
+    fun refreshAudioDevices() {
+        val devices = AudioRecorderManager.listInputDevices(getApplication())
+        _uiState.update { state ->
+            val stillThere = state.selectedDeviceId?.let { id -> devices.any { d -> d.id == id } } ?: true
+            state.copy(
+                audioDevices = devices,
+                selectedDeviceId = if (stillThere) state.selectedDeviceId else null
+            )
+        }
+    }
+
+    fun selectAudioDevice(deviceId: Int?) {
+        _uiState.update { it.copy(selectedDeviceId = deviceId) }
+        val label = if (deviceId == null) {
+            "自动优选（DJI/USB 接收器优先）"
+        } else {
+            _uiState.value.audioDevices.firstOrNull { it.id == deviceId }?.name ?: "指定设备"
+        }
+        audioRecorder?.preferredDeviceId = deviceId
+        showToast("录音音源：$label" + if (_uiState.value.isRecording) "（下段录音生效）" else "")
+    }
+
+    fun refreshBatteryState() {
+        _uiState.update {
+            it.copy(batteryExempt = KeepAliveHelper.isBatteryOptimizationIgnored(getApplication()))
+        }
+    }
+
+    fun requestBatteryExemption() {
+        KeepAliveHelper.requestBatteryExemption(getApplication())
+    }
+
+    fun openAutoStartSettings() {
+        KeepAliveHelper.openAutoStartSettings(getApplication())
     }
 
     fun startRecording() {
@@ -166,13 +220,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
+        refreshAudioDevices()
+
         _uiState.update {
             it.copy(
                 isRecording = true,
                 recordDurationSeconds = 0,
                 wsStatusText = "正在连接...",
                 wsStatusConnected = false,
-                interimText = "fun-asr-realtime 感知层监听中..."
+                interimText = "fun-asr-realtime 感知层监听中...",
+                viewingSessionTitle = null,
+                volumeHistory = emptyList()
             )
         }
 
@@ -193,7 +251,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         webSocketManager?.start()
 
-        // 启动录音机
+        // 启动录音机（带设备路由与插拔监听）
         audioRecorder = AudioRecorderManager(
             context = getApplication(),
             onChunk = { chunk ->
@@ -206,15 +264,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             },
             onVolume = { vol ->
-                _uiState.update { it.copy(currentVolume = vol) }
-            }
-        )
+                _uiState.update {
+                    val history = (it.volumeHistory + vol).takeLast(VOLUME_HISTORY_MAX)
+                    it.copy(currentVolume = vol, volumeHistory = history)
+                }
+            },
+            onDeviceEvent = { msg -> showToast(msg) }
+        ).apply {
+            preferredDeviceId = _uiState.value.selectedDeviceId
+        }
 
         val started = audioRecorder?.start() ?: false
         if (!started) {
             stopRecording()
             showToast("麦克风启动失败，请检查录音权限！")
+            return
         }
+
+        val deviceLabel = audioRecorder?.activeDeviceLabel ?: "手机内置麦克风"
+        _uiState.update { it.copy(activeDeviceLabel = deviceLabel) }
+
+        // 前台服务保活 + 常驻通知（锁屏/切后台继续录）
+        try {
+            val intent = RecordingService.startIntent(getApplication(), deviceLabel)
+            ContextCompat.startForegroundService(getApplication(), intent)
+        } catch (e: Exception) {
+            Log.w(TAG, "start RecordingService failed: ${e.message}")
+        }
+        RecordingBus.onStopRequested = { stopRecording() }
     }
 
     fun stopRecording() {
@@ -232,13 +309,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         audioRecorder?.stop()
         webSocketManager?.stop()
 
+        // 停止前台服务
+        try {
+            getApplication<Application>().stopService(
+                Intent(getApplication(), RecordingService::class.java)
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "stop RecordingService failed: ${e.message}")
+        }
+        RecordingBus.onStopRequested = null
+
         // 缓存本次无损 WAV 文件
         val wav = audioRecorder?.exportWavFile()
         _uiState.update { it.copy(exportedWavFile = wav) }
 
-        // 若录音字数充沛，提示可生成纪要
         if (_uiState.value.utterances.isNotEmpty()) {
-            showToast("录音已完成并固化，可立即生成人设纪要！")
+            showToast("录音已完成并固化，可立即生成纪要！")
+            refreshSessions()
         }
     }
 
@@ -264,8 +351,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         sentenceId = event.sentenceId,
                         speaker = "发言人",
                         time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date()),
-                        text = event.text,
-                        rawText = event.rawText,
+                        text = event.rawText.ifBlank { event.text },
+                        rawText = event.rawText.ifBlank { event.text },
                         isCleansed = false
                     )
                     _uiState.update {
@@ -276,10 +363,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 is AsrEvent.Cleansed -> {
+                    // 清洗稿只进 cleansedText，展示默认仍为原文（与 Web Fix 2 一致）
                     _uiState.update { state ->
                         val updated = state.utterances.map { u ->
                             if (u.sentenceId == event.sentenceId) {
-                                u.copy(text = event.text, isCleansed = true, latencyMs = event.latencyMs)
+                                u.copy(cleansedText = event.text, isCleansed = true, latencyMs = event.latencyMs)
                             } else u
                         }
                         state.copy(utterances = updated)
@@ -331,9 +419,106 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         showToast("已设置断句判定: $label")
     }
 
+    fun toggleShowCleansed(show: Boolean) {
+        _uiState.update { it.copy(showCleansed = show) }
+    }
+
+    /** 从归档打开一个历史会话到工作台（只读回看，可继续做分离/纪要） */
+    fun loadSession(sessionId: String) {
+        viewModelScope.launch {
+            val res = apiClient.fetchSession(sessionId)
+            if (res.isSuccess) {
+                val utterances = res.getOrNull() ?: emptyList()
+                val summary = _uiState.value.sessions.firstOrNull { it.id == sessionId }
+                _uiState.update {
+                    it.copy(
+                        utterances = utterances,
+                        viewingSessionTitle = summary?.title ?: "历史会话",
+                        exportedWavFile = null,
+                        wsStatusText = "归档回看"
+                    )
+                }
+                showToast("已载入历史会话：${summary?.title ?: sessionId}")
+            } else {
+                showToast("载入历史会话失败，请检查网络")
+            }
+        }
+    }
+
+    /** 说话人分离：本地 WAV → 上传 → 离线精转写轮询 → 结果回填逐字稿 */
+    fun diarizeCurrentRecording() {
+        if (_uiState.value.isDiarizing) return
+        val wav = _uiState.value.exportedWavFile ?: audioRecorder?.exportWavFile()
+        if (wav == null || !wav.exists() || wav.length() <= 44) {
+            showToast("暂无可用录音文件，请先完成一段录音")
+            return
+        }
+        _uiState.update { it.copy(exportedWavFile = wav, isDiarizing = true, diarizeStatus = "正在上传音频…") }
+        viewModelScope.launch {
+            try {
+                val audioId = apiClient.diarizeUpload(wav).getOrElse {
+                    throw IllegalStateException("上传失败：${it.message}")
+                }
+                _uiState.update { it.copy(diarizeStatus = "已提交精转写，识别说话人中…") }
+                val taskId = apiClient.diarizeStart(audioId).getOrElse {
+                    throw IllegalStateException("启动失败：${it.message}")
+                }
+                var sentences: List<top.tpgofighting.voicebrain.data.api.DiarizedSentence> = emptyList()
+                var finished = false
+                repeat(48) { attempt ->
+                    delay(2500)
+                    val (status, list) = apiClient.diarizeStatus(taskId).getOrElse {
+                        throw IllegalStateException("查询进度失败：${it.message}")
+                    }
+                    if (status == "SUCCEEDED") {
+                        sentences = list
+                        finished = true
+                        return@repeat
+                    }
+                    _uiState.update { it.copy(diarizeStatus = "精转写进行中…（${attempt + 1}）") }
+                }
+                if (!finished || sentences.isEmpty()) {
+                    showToast("说话人分离未完成或无结果，请稍后重试")
+                    return@launch
+                }
+                val speakers = sentences.map { s -> s.speakerId }.distinct().sorted()
+                val diarized = sentences.mapIndexed { idx, s ->
+                    val beginSec = s.beginMs / 1000
+                    val timeLabel = String.format("%02d:%02d", beginSec / 60, beginSec % 60)
+                    Utterance(
+                        id = idx + 1,
+                        sentenceId = "diar-${s.beginMs}-$idx",
+                        speaker = "发言人 ${s.speakerId + 1}",
+                        time = timeLabel,
+                        text = s.text,
+                        rawText = s.text,
+                        beginMs = s.beginMs
+                    )
+                }
+                _uiState.update {
+                    it.copy(
+                        utterances = diarized,
+                        viewingSessionTitle = "说话人分离结果"
+                    )
+                }
+                showToast("分离完成：共识别出 ${speakers.size} 位说话人、${sentences.size} 句")
+            } catch (e: Exception) {
+                showToast("说话人分离失败：${e.message}")
+            } finally {
+                _uiState.update { it.copy(isDiarizing = false, diarizeStatus = "") }
+            }
+        }
+    }
+
     fun selectPersona(persona: Persona) {
         _uiState.update { it.copy(currentPersona = persona) }
         showToast("已切换人设为: ${persona.name} (${persona.badge})")
+    }
+
+    fun setMinutesTemplate(templateId: String) {
+        _uiState.update { it.copy(minutesTemplate = templateId) }
+        val label = MINUTES_TEMPLATES.firstOrNull { it.id == templateId }?.label ?: "通用"
+        showToast("纪要模板：$label")
     }
 
     fun generateMinutes() {
@@ -344,10 +529,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val persona = _uiState.value.currentPersona
+        val template = _uiState.value.minutesTemplate
         _uiState.update { it.copy(isGeneratingMinutes = true) }
 
         viewModelScope.launch {
-            val result = apiClient.generateMinutes(utterances, persona)
+            val result = apiClient.generateMinutes(utterances, persona, template = template)
             _uiState.update { state ->
                 if (result.isSuccess) {
                     state.copy(
@@ -362,7 +548,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             if (result.isSuccess) {
                 showToast("成功生成【${persona.name}】结构化纪要！已自动沉淀记忆。")
-                // 刷新记忆库
                 fetchRemoteData()
             } else {
                 showToast("生成纪要失败: ${result.exceptionOrNull()?.message}")
@@ -378,7 +563,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun polishCurrentMinutes() {
-        val text = _uiState.value.utterances.joinToString("\n") { "${it.speaker}: ${it.text}" }
+        val text = _uiState.value.utterances.joinToString("\n") { "${it.speaker}: ${it.rawText.ifBlank { it.text }}" }
         if (text.isBlank()) return
 
         _uiState.update { it.copy(isPolishing = true) }
@@ -412,6 +597,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(memorySubTab = tab) }
     }
 
+    fun setSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun runSearch() {
+        val q = _uiState.value.searchQuery.trim()
+        if (q.isBlank()) return
+        _uiState.update { it.copy(isSearching = true, searchDone = false) }
+        viewModelScope.launch {
+            val res = apiClient.search(q)
+            _uiState.update {
+                it.copy(
+                    searchHits = res.getOrNull() ?: emptyList(),
+                    isSearching = false,
+                    searchDone = true
+                )
+            }
+            if (res.isFailure) showToast("检索失败，请检查网络")
+        }
+    }
+
     fun askSecondBrain(question: String) {
         val q = question.trim()
         if (q.isBlank()) return
@@ -422,29 +628,59 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             content = q,
             timestamp = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
         )
+        val assistantId = "brain-${System.currentTimeMillis()}"
+        val placeholder = BrainChatMessage(
+            id = assistantId,
+            isUser = false,
+            content = "",
+            timestamp = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
+            isStreaming = true
+        )
 
         _uiState.update {
             it.copy(
-                brainChatHistory = it.brainChatHistory + userMsg,
+                brainChatHistory = it.brainChatHistory + userMsg + placeholder,
                 isBrainThinking = true
             )
         }
 
         viewModelScope.launch {
-            val result = apiClient.querySecondBrain(q)
-            val answerText = result.getOrNull() ?: "抱歉，检索记忆库遇到网络问题，请稍后重试。"
-            val assistantMsg = BrainChatMessage(
-                id = "brain-${System.currentTimeMillis()}",
-                isUser = false,
-                content = answerText,
-                timestamp = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
-                citations = listOf("全双工语音架构研讨", "Personal Agent 讨论")
-            )
-            _uiState.update {
-                it.copy(
-                    brainChatHistory = it.brainChatHistory + assistantMsg,
-                    isBrainThinking = false
-                )
+            // 优先流式：逐字追加；final 事件落真实来源
+            val streamResult = apiClient.querySecondBrainStream(q) { delta ->
+                _uiState.update { state ->
+                    val updated = state.brainChatHistory.map { msg ->
+                        if (msg.id == assistantId) msg.copy(content = msg.content + delta) else msg
+                    }
+                    state.copy(brainChatHistory = updated)
+                }
+            }
+            val answer = if (streamResult.isSuccess) {
+                streamResult.getOrNull()
+            } else {
+                // 流式在首字前失败时回退非流式
+                apiClient.querySecondBrain(q).getOrNull()
+            }
+            _uiState.update { state ->
+                val updated = state.brainChatHistory.map { msg ->
+                    if (msg.id == assistantId) {
+                        if (answer != null) {
+                            msg.copy(
+                                content = answer.answer.ifBlank { msg.content },
+                                sources = answer.sources,
+                                citations = answer.sources.map { s ->
+                                    s.sessionTitle.ifBlank { "历史录音" }
+                                }.distinct(),
+                                isStreaming = false
+                            )
+                        } else {
+                            msg.copy(
+                                content = if (msg.content.isBlank()) "抱歉，检索记忆库遇到网络问题，请稍后重试。" else msg.content,
+                                isStreaming = false
+                            )
+                        }
+                    } else msg
+                }
+                state.copy(brainChatHistory = updated, isBrainThinking = false)
             }
         }
     }

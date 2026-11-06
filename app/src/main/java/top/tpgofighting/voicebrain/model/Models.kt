@@ -11,7 +11,10 @@ data class Utterance(
     val text: String,
     val rawText: String,
     val isCleansed: Boolean = false,
-    val latencyMs: Long = 0
+    val latencyMs: Long = 0,
+    // v1.1.0: 清洗稿单独存放，展示默认用原文（与 Web 端 Fix 2 对齐）；beginMs 供说话人分离对齐
+    val cleansedText: String? = null,
+    val beginMs: Long = 0
 )
 
 data class Persona(
@@ -133,7 +136,20 @@ data class Minutes(
     val actionItems: List<ActionItem> = emptyList(),
     val unresolvedQuestions: List<String> = emptyList(),
     val mindmapMarkdown: String = "",
-    val polishedDraft: String = ""
+    val polishedDraft: String = "",
+    // v1.1.0: 纪要场景模板（与 Web 端三期对齐）
+    val template: String = "general",
+    val templateLabel: String = "通用"
+)
+
+/** 纪要场景模板，与服务端 MINUTES_TEMPLATES 一一对应 */
+data class MinutesTemplate(val id: String, val label: String, val hint: String)
+
+val MINUTES_TEMPLATES = listOf(
+    MinutesTemplate("general", "通用", "全景速览与要点提炼"),
+    MinutesTemplate("meeting", "会议", "决议出处与待办责任，缺失不编造"),
+    MinutesTemplate("lecture", "课程", "知识点速览与复习要点"),
+    MinutesTemplate("interview", "访谈", "金句逐字引用不改写")
 )
 
 @Serializable
@@ -168,10 +184,46 @@ data class LmmWikiEntity(
     val category: String
 )
 
+/** 问答的真实引用来源（服务端检索命中的原文片段，v1.1.0 起不再使用假引用） */
+data class BrainSource(
+    val sessionId: String = "",
+    val sessionTitle: String = "",
+    val text: String = ""
+)
+
 data class BrainChatMessage(
     val id: String,
     val isUser: Boolean,
     val content: String,
     val timestamp: String,
-    val citations: List<String> = emptyList()
+    val citations: List<String> = emptyList(),
+    val sources: List<BrainSource> = emptyList(),
+    val isStreaming: Boolean = false
+)
+
+/** 全文检索命中（GET /api/search） */
+data class SearchHit(
+    val kind: String, // transcript | memory
+    val sessionId: String = "",
+    val sessionTitle: String = "",
+    val stamp: String = "",
+    val text: String = "",
+    val category: String = ""
+)
+
+/** 历史会话摘要（GET /api/sessions） */
+data class SessionSummary(
+    val id: String,
+    val title: String,
+    val stamp: String = "",
+    val utteranceCount: Int = 0,
+    val durationLabel: String = ""
+)
+
+/** 可选录音输入设备（内置麦 / USB 接收器如 DJI Mic Mini RX / 蓝牙等） */
+data class AudioInputDevice(
+    val id: Int,
+    val name: String,
+    val kind: String, // builtin | usb | bluetooth | wired | other
+    val isDji: Boolean = false
 )

@@ -1,5 +1,6 @@
 package top.tpgofighting.voicebrain.ui.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,7 +34,10 @@ fun MemoryBrainTab(
     onSetSubTab: (Int) -> Unit,
     onSetCategory: (String) -> Unit,
     onSetSearchQuery: (String) -> Unit,
-    onAskSecondBrain: (String) -> Unit
+    onAskSecondBrain: (String) -> Unit,
+    onSetFullTextQuery: (String) -> Unit = {},
+    onRunSearch: () -> Unit = {},
+    onOpenSession: (String) -> Unit = {}
 ) {
     var inputQuery by remember { mutableStateOf("") }
     val chatListState = rememberLazyListState()
@@ -87,7 +91,23 @@ fun MemoryBrainTab(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon(Icons.Filled.SmartToy, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Text("问问你的第二大脑", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("问第二大脑", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Button(
+                onClick = { onSetSubTab(2) },
+                modifier = Modifier.weight(1f).height(32.dp),
+                shape = RoundedCornerShape(6.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (state.memorySubTab == 2) MaterialTheme.colorScheme.surface else Color.Transparent,
+                    contentColor = if (state.memorySubTab == 2) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Icons.Filled.ManageSearch, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Text("全文检索", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -174,7 +194,7 @@ fun MemoryBrainTab(
                     MemoryCardItem(item)
                 }
             }
-        } else {
+        } else if (state.memorySubTab == 1) {
             // 3. 子面板 B: 问问你的第二大脑 Agent
             Column(
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -214,7 +234,7 @@ fun MemoryBrainTab(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(state.brainChatHistory, key = { it.id }) { msg ->
-                        ChatBubbleRow(msg)
+                        ChatBubbleRow(msg, onSourceClick = { sessionId -> onOpenSession(sessionId) })
                     }
 
                     if (state.isBrainThinking) {
@@ -262,6 +282,95 @@ fun MemoryBrainTab(
                         colors = ButtonDefaults.buttonColors(containerColor = TPNavyDark, contentColor = TPMustardYellow)
                     ) {
                         Icon(Icons.Filled.Send, contentDescription = "发送", modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        } else {
+            // 4. 子面板 C: 全文检索（逐字稿原文 + 长期记忆，服务端 /api/search）
+            Column(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedTextField(
+                        value = state.searchQuery,
+                        onValueChange = onSetFullTextQuery,
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        placeholder = { Text("检索全部录音原文与记忆，如：限流", fontSize = 11.sp) },
+                        leadingIcon = { Icon(Icons.Filled.ManageSearch, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        shape = RoundedCornerShape(8.dp),
+                        singleLine = true
+                    )
+                    Button(
+                        onClick = onRunSearch,
+                        modifier = Modifier.height(46.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = TPNavyDark, contentColor = TPMustardYellow)
+                    ) {
+                        Text("检索", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+
+                if (state.isSearching) {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(24.dp))
+                    }
+                } else if (state.searchDone && state.searchHits.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Text("没有命中，换个关键词试试", fontSize = 12.sp, color = Color.Gray)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(state.searchHits, key = { "${it.kind}-${it.sessionId}-${it.text.hashCode()}" }) { hit ->
+                            TPCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = hit.kind == "transcript" && hit.sessionId.isNotBlank()) {
+                                        onOpenSession(hit.sessionId)
+                                    }
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    TPBadge(
+                                        text = if (hit.kind == "memory") "记忆 · ${hit.category}" else "录音原文",
+                                        variant = if (hit.kind == "memory") TPBadgeVariant.PURPLE else TPBadgeVariant.BLUE
+                                    )
+                                    if (hit.sessionTitle.isNotBlank()) {
+                                        Text(
+                                            text = hit.sessionTitle,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = hit.text,
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                if (hit.kind == "transcript") {
+                                    Text(
+                                        text = "点按在工作台打开这段录音",
+                                        fontSize = 9.sp,
+                                        color = TPAccentBlue,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -320,7 +429,7 @@ fun MemoryCardItem(item: MemoryItem) {
 }
 
 @Composable
-fun ChatBubbleRow(msg: BrainChatMessage) {
+fun ChatBubbleRow(msg: BrainChatMessage, onSourceClick: (String) -> Unit = {}) {
     val isUser = msg.isUser
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -359,14 +468,63 @@ fun ChatBubbleRow(msg: BrainChatMessage) {
                     )
                 }
 
-                Text(
-                    text = msg.content,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp,
-                    color = if (isUser) TPNavyDark else MaterialTheme.colorScheme.onSurface
-                )
+                // 流式生成中显示闪烁光标
+                val cursorAlpha = if (msg.isStreaming) {
+                    val transition = rememberInfiniteTransition(label = "cursor")
+                    val alpha by transition.animateFloat(
+                        initialValue = 0.15f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(tween(450), RepeatMode.Reverse),
+                        label = "cursorAlpha"
+                    )
+                    alpha
+                } else 0f
 
-                if (msg.citations.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = msg.content.ifBlank { if (msg.isStreaming) "正在检索原文…" else "" },
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        color = if (isUser) TPNavyDark else MaterialTheme.colorScheme.onSurface
+                    )
+                    if (msg.isStreaming) {
+                        Text(
+                            text = "▍",
+                            fontSize = 12.sp,
+                            color = TPAccentPurple.copy(alpha = cursorAlpha)
+                        )
+                    }
+                }
+
+                // 真实来源：服务端检索命中的原文片段（可点开对应会话）
+                if (msg.sources.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        msg.sources.take(4).forEach { src ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(TPAccentPurpleLight)
+                                    .clickable(enabled = src.sessionId.isNotBlank()) { onSourceClick(src.sessionId) }
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = "来源 · ${src.sessionTitle.ifBlank { "历史录音" }}",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = TPAccentPurple
+                                )
+                                Text(
+                                    text = "「${src.text.take(80)}」",
+                                    fontSize = 10.sp,
+                                    lineHeight = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                } else if (msg.citations.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),

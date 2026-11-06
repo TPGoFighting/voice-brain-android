@@ -136,44 +136,50 @@ fun TPBadge(
 
 /**
  * 实时声波可视化组件 (Audio Waveform Canvas)
+ * v1.1.0：改为真实音量历史驱动（每根柱子对应最近一帧 RMS），
+ * 柱高用弹簧动画跟随，不再用正弦伪造律动。
  */
 @Composable
 fun TPWaveformView(
     volume: Float,
     isRecording: Boolean,
     modifier: Modifier = Modifier,
-    barColor: Color = TPMustardYellowDark
+    barColor: Color = TPMustardYellowDark,
+    history: List<Float> = emptyList()
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "waveAnim")
-    val phase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 6.28f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "phase"
-    )
+    val barCount = 36
+    val displayHistory = remember(history, volume) {
+        if (history.isNotEmpty()) history.takeLast(barCount)
+        else List(barCount) { volume }
+    }
 
-    Canvas(modifier = modifier.fillMaxWidth().height(36.dp)) {
-        val width = size.width
-        val height = size.height
-        val barCount = 36
-        val barWidth = width / (barCount * 1.5f)
-        val spacing = barWidth * 0.5f
-
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(36.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         for (i in 0 until barCount) {
-            val x = i * (barWidth + spacing)
-            val baseSin = kotlin.math.sin(phase + i * 0.35f)
-            val currentVol = if (isRecording) (volume * 0.7f + 0.3f * baseSin.toFloat().coerceAtLeast(0.1f)) else 0.08f
-            val barHeight = (height * currentVol.coerceIn(0.08f, 0.95f)).coerceAtLeast(4f)
-            val y = (height - barHeight) / 2f
-
-            drawRoundRect(
-                color = if (isRecording) barColor else Color.LightGray,
-                topLeft = Offset(x, y),
-                size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
+            val target = if (isRecording) {
+                (displayHistory.getOrNull(i) ?: 0.05f).coerceIn(0.05f, 0.95f)
+            } else {
+                0.08f
+            }
+            val animated by animateFloatAsState(
+                targetValue = target,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "bar$i"
+            )
+            Box(
+                modifier = Modifier
+                    .width(3.5.dp)
+                    .fillMaxHeight(animated)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (isRecording) barColor else Color.LightGray)
             )
         }
     }

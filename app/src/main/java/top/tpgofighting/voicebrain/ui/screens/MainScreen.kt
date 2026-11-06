@@ -117,7 +117,27 @@ fun MainScreen(viewModel: MainViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (currentTab) {
+            androidx.compose.animation.AnimatedContent(
+                targetState = currentTab,
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                        )
+                    ) + androidx.compose.animation.slideInHorizontally(
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                        ),
+                        initialOffsetX = { if (targetState.ordinal > initialState.ordinal) 60 else -60 }
+                    )) togetherWith androidx.compose.animation.fadeOut(
+                        animationSpec = androidx.compose.animation.core.tween(120)
+                    )
+                },
+                label = "tabTransition"
+            ) { tab ->
+            when (tab) {
                 NavigationTab.LIVE -> {
                     LiveWorkbenchTab(
                         state = uiState,
@@ -129,7 +149,14 @@ fun MainScreen(viewModel: MainViewModel) {
                             viewModel.generateMinutes()
                             currentTab = NavigationTab.MINUTES
                         },
-                        onSetSilence = { viewModel.setSentenceSilence(it) }
+                        onSetSilence = { viewModel.setSentenceSilence(it) },
+                        onSelectDevice = { viewModel.selectAudioDevice(it) },
+                        onToggleCleansed = { viewModel.toggleShowCleansed(it) },
+                        onDiarize = { viewModel.diarizeCurrentRecording() },
+                        onOpenSession = { viewModel.loadSession(it) },
+                        onRefreshSessions = { viewModel.refreshSessions() },
+                        onBatteryExemption = { viewModel.requestBatteryExemption() },
+                        onAutoStartSettings = { viewModel.openAutoStartSettings() }
                     )
                 }
                 NavigationTab.MINUTES -> {
@@ -139,7 +166,8 @@ fun MainScreen(viewModel: MainViewModel) {
                         onGenerateMinutes = { viewModel.generateMinutes() },
                         onToggleViewMode = { viewModel.toggleMinutesViewMode(it) },
                         onPolishDraft = { viewModel.polishCurrentMinutes() },
-                        onShowToast = { viewModel.showToast(it) }
+                        onShowToast = { viewModel.showToast(it) },
+                        onSetTemplate = { viewModel.setMinutesTemplate(it) }
                     )
                 }
                 NavigationTab.MEMORY -> {
@@ -148,7 +176,13 @@ fun MainScreen(viewModel: MainViewModel) {
                         onSetSubTab = { viewModel.setMemorySubTab(it) },
                         onSetCategory = { viewModel.setMemoryCategory(it) },
                         onSetSearchQuery = { viewModel.setMemorySearchQuery(it) },
-                        onAskSecondBrain = { viewModel.askSecondBrain(it) }
+                        onAskSecondBrain = { viewModel.askSecondBrain(it) },
+                        onSetFullTextQuery = { viewModel.setSearchQuery(it) },
+                        onRunSearch = { viewModel.runSearch() },
+                        onOpenSession = {
+                            viewModel.loadSession(it)
+                            currentTab = NavigationTab.LIVE
+                        }
                     )
                 }
                 NavigationTab.OBSIDIAN -> {
@@ -158,6 +192,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         onAskObsidian = { viewModel.askObsidian(it) }
                     )
                 }
+            }
             }
         }
     }

@@ -42,16 +42,56 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* 结果不阻断功能：无通知权限时前台服务照常运行，仅通知不进通知栏 */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         checkAndRequestAudioPermission()
+        checkAndRequestNotificationPermission()
         observeUiEvents()
+        observeRecordingKeepScreenOn()
 
         setContent {
             TPVoiceBrainTheme {
                 MainScreen(viewModel = viewModel)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 从系统设置页返回时刷新保活状态与外接设备清单（DJI 接收器插拔）
+        viewModel.refreshBatteryState()
+        viewModel.refreshAudioDevices()
+    }
+
+    /** 录音期间保持屏幕常亮（Activity 可见时生效），停止后自动恢复系统休眠 */
+    private fun observeRecordingKeepScreenOn() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    if (state.isRecording) {
+                        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
+                        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun checkAndRequestNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
     }

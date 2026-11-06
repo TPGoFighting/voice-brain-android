@@ -20,7 +20,8 @@ import kotlin.math.sqrt
 class AudioRecorderManager(
     private val context: Context,
     private val onChunk: (ByteArray) -> Unit,
-    private val onVolume: (Float) -> Unit
+    private val onVolume: (Float) -> Unit,
+    private val onDeviceEvent: ((String) -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "AudioRecorderManager"
@@ -28,7 +29,74 @@ class AudioRecorderManager(
         const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
         const val CHUNK_SIZE_BYTES = 3200 // 100ms at 16kHz 16-bit mono
+
+        /** 枚举当前可用的录音输入设备（内置麦 / USB 接收器 / 蓝牙 / 有线耳麦） */
+        fun listInputDevices(context: Context): List<top.tpgofighting.voicebrain.model.AudioInputDevice> {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                ?: return emptyList()
+            val devices = am.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS)
+            val seen = mutableSetOf<String>()
+            val result = mutableListOf<top.tpgofighting.voicebrain.model.AudioInputDevice>()
+            for (d in devices) {
+                if (!d.isSource) continue
+                val kind = when (d.type) {
+                    android.media.AudioDeviceInfo.TYPE_BUILTIN_MIC -> "builtin"
+                    android.media.AudioDeviceInfo.TYPE_USB_DEVICE,
+                    android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
+                    android.media.AudioDeviceInfo.TYPE_USB_ACCESSORY -> "usb"
+                    android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                    @Suppress("DEPRECATION") android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "bluetooth"
+                    android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET -> "wired"
+                    else -> "other"
+                }
+                if (kind == "other") continue
+                val rawName = try {
+                    d.productName?.toString()?.trim().orEmpty()
+                } catch (e: Exception) {
+                    ""
+                }
+                val isDji = rawName.contains("DJI", ignoreCase = true) ||
+                    rawName.contains("Mic Mini", ignoreCase = true) ||
+                    rawName.contains("Wireless Mic", ignoreCase = true)
+                val friendly = when {
+                    isDji -> "DJI Mic Mini 接收器"
+                    kind == "builtin" -> "手机内置麦克风"
+                    kind == "usb" -> rawName.ifBlank { "USB 音频设备" }
+                    kind == "bluetooth" -> rawName.ifBlank { "蓝牙麦克风" }
+                    kind == "wired" -> "有线耳机麦克风"
+                    else -> rawName.ifBlank { "外部麦克风" }
+                }
+                val key = "$kind-$friendly"
+                if (!seen.add(key)) continue
+                result.add(
+                    top.tpgofighting.voicebrain.model.AudioInputDevice(
+                        id = d.id,
+                        name = friendly,
+                        kind = kind,
+                        isDji = isDji
+                    )
+                )
+            }
+            // 排序：DJI/USB 优先，其次蓝牙/有线，最后内置
+            val order = mapOf("usb" to 0, "bluetooth" to 1, "wired" to 2, "builtin" to 3, "other" to 4)
+            return result.sortedBy { order[it.kind] ?: 4 }
+        }
+
+        fun findDeviceInfo(context: Context, deviceId: Int): android.media.AudioDeviceInfo? {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+                ?: return null
+            return am.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS).firstOrNull { it.id == deviceId }
+        }
     }
+
+    /** 用户选定的输入设备 id；null = 自动（优先 DJI/USB 接收器，否则系统默认） */
+    @Volatile
+    var preferredDeviceId: Int? = null
+
+    /** 本次录音实际使用的设备名（UI 展示） */
+    @Volatile
+    var activeDeviceLabel: String = "手机内置麦克风"
+        private set
 
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
@@ -107,6 +175,34 @@ class AudioRecorderManager(
 
         audioRecord = initializedRecord
 
+        // 输入设备路由：用户指定优先；未指定时自动优选 DJI/USB 接收器（DJI Mic Mini RX 走 USB 音频类）
+        try {
+            val inputs = listInputDevices(context)
+            val chosen = when {
+                preferredDeviceId != null -> inputs.firstOrNull { it.id == preferredDeviceId }
+                else -> inputs.firstOrNull { it.isDji } ?: inputs.firstOrNull { it.kind == "usb" }
+            }
+            if (chosen != null) {
+                val info = findDeviceInfo(context, chosen.id)
+                if (info != null) {
+                    val ok = initializedRecord.setPreferredDevice(info)
+                    if (ok) {
+                        activeDeviceLabel = chosen.name
+                        Log.i(TAG, "Preferred input device applied: ${chosen.name} (id=${chosen.id}, kind=${chosen.kind})")
+                        if (chosen.isDji) onDeviceEvent?.invoke("已接入 DJI Mic Mini 接收器，录音将使用领夹麦音源")
+                    } else {
+                        Log.w(TAG, "setPreferredDevice returned false for ${chosen.name}")
+                    }
+                }
+            } else {
+                activeDeviceLabel = "手机内置麦克风"
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Apply preferred input device failed: ${e.message}")
+        }
+
+        registerDeviceWatch()
+
         try {
             audioRecord?.startRecording()
             isRecording = true
@@ -175,8 +271,51 @@ class AudioRecorderManager(
         }
     }
 
+    private var deviceCallback: android.media.AudioDeviceCallback? = null
+
+    /** 录音期间监听外接麦克风插拔：DJI 接收器插入/拔出时给出提示（系统会自动回退内置麦） */
+    private fun registerDeviceWatch() {
+        try {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager ?: return
+            if (deviceCallback != null) return
+            val cb = object : android.media.AudioDeviceCallback() {
+                override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>?) {
+                    val inputs = listInputDevices(context)
+                    val dji = inputs.firstOrNull { it.isDji }
+                    if (dji != null) {
+                        onDeviceEvent?.invoke("检测到 DJI Mic Mini 接收器，下次录音将优先使用；当前录音如需切换请重开")
+                    }
+                }
+
+                override fun onAudioDevicesRemoved(removedDevices: Array<out android.media.AudioDeviceInfo>?) {
+                    removedDevices ?: return
+                    val removedActive = removedDevices.any { it.id == preferredDeviceId }
+                    if (removedActive || activeDeviceLabel.contains("DJI") || activeDeviceLabel.contains("USB")) {
+                        onDeviceEvent?.invoke("外接麦克风已断开，系统已自动回退到手机内置麦克风")
+                        activeDeviceLabel = "手机内置麦克风"
+                    }
+                }
+            }
+            am.registerAudioDeviceCallback(cb, null)
+            deviceCallback = cb
+        } catch (e: Exception) {
+            Log.w(TAG, "registerDeviceWatch failed: ${e.message}")
+        }
+    }
+
+    private fun unregisterDeviceWatch() {
+        try {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager ?: return
+            deviceCallback?.let { am.unregisterAudioDeviceCallback(it) }
+            deviceCallback = null
+        } catch (e: Exception) {
+            Log.w(TAG, "unregisterDeviceWatch failed: ${e.message}")
+        }
+    }
+
     fun stop() {
         isRecording = false
+        unregisterDeviceWatch()
         recordingJob?.cancel()
         recordingJob = null
 

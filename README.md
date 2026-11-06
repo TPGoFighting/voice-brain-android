@@ -62,3 +62,17 @@
 构建生成的 APK 位于：
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
+
+## v1.1.0 (2026-11-06) 全量升级
+
+与 Web 端三期升级对齐，并针对 Android 设备体验做系统性优化：
+
+- **契约修复（P0）**：纪要接口对齐服务端——请求改发 `persona` + `template` + 原文，响应从 `data` 层解析，未决事项读 `unresolved_risks`；此前安卓纪要因字段错位一直渲染为空壳，现已修复。移除全部假数据种子与假纪要兜底、假引用，改为真实空状态。
+- **流式问答**：第二大脑问答接 `/api/memory/query/stream` SSE 逐字生成，final 事件落真实来源（可点开对应历史会话）；流式失败自动回退非流式。
+- **全文检索**：新增「全文检索」子页，接 `/api/search` 检索全部录音原文与长期记忆，命中可跳转工作台回看。
+- **纪要模板**：通用 / 会议 / 课程 / 访谈四模板可选，与服务端 MINUTES_TEMPLATES 对齐。
+- **说话人分离**：本地 WAV 上传离线精转写（paraformer-v2 + diarization），结果按说话人着色回填逐字稿。
+- **历史归档**：工作台可打开服务端历史会话回看。
+- **DJI Mic Mini 优化**：枚举音频输入设备，自动优选 USB 接收器（DJI Mic Mini RX），支持手动切换音源，录音中监听接收器插拔并提示；逐字稿默认展示原文、清洗稿可切换。
+- **后台保活**：录音前台服务（microphone 类型）+ WakeLock + 常驻通知（计时/停止动作）；Android 16 设备启用 Live Updates 提升（ProgressStyle + Promoted Ongoing），适配 ColorOS 17 流体云；内置电池豁免与 ColorOS 自启动设置引导。
+- **UI/UX 与动效**：波形改为真实音量历史驱动 + 弹簧动画；录音按钮按压弹簧反馈；标签页切换弹簧转场；流式回答闪烁光标；录音时屏幕常亮；断句默认 1200ms 与服务端对齐。
