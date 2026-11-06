@@ -37,7 +37,8 @@ fun MemoryBrainTab(
     onAskSecondBrain: (String) -> Unit,
     onSetFullTextQuery: (String) -> Unit = {},
     onRunSearch: () -> Unit = {},
-    onOpenSession: (String) -> Unit = {}
+    onOpenSession: (String) -> Unit = {},
+    onGoRecord: () -> Unit = {}
 ) {
     var inputQuery by remember { mutableStateOf("") }
     val chatListState = rememberLazyListState()
@@ -190,8 +191,46 @@ fun MemoryBrainTab(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(filteredMemories, key = { it.id }) { item ->
-                    MemoryCardItem(item)
+                if (filteredMemories.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 36.dp, horizontal = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (state.memories.isEmpty()) {
+                                Text(
+                                    "还没有沉淀任何记忆",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "录一段音并生成纪要后，其中的决策、承诺和偏好会自动提炼到这里，越用越懂你。",
+                                    fontSize = 11.sp,
+                                    lineHeight = 16.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Button(
+                                    onClick = onGoRecord,
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark)
+                                ) {
+                                    Text("去录一段", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                                }
+                            } else {
+                                Text(
+                                    "当前分类和搜索下没有记忆，换个分类或清空搜索试试",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    items(filteredMemories, key = { it.id }) { item ->
+                        MemoryCardItem(item)
+                    }
                 }
             }
         } else if (state.memorySubTab == 1) {
@@ -233,6 +272,17 @@ fun MemoryBrainTab(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (state.brainChatHistory.isEmpty() && !state.isBrainThinking) {
+                        item {
+                            Text(
+                                "向第二大脑提问，它会基于你的录音原文和长期记忆回答，并标出真实出处——没记录的就直说没提到。",
+                                fontSize = 11.sp,
+                                lineHeight = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp)
+                            )
+                        }
+                    }
                     items(state.brainChatHistory, key = { it.id }) { msg ->
                         ChatBubbleRow(msg, onSourceClick = { sessionId -> onOpenSession(sessionId) })
                     }
