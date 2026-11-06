@@ -63,6 +63,12 @@
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
+## v1.2.5 (2026-11-06) 批次 N · 热修复：Lottie 染色闪退
+
+v1.2.4 冒烟全红并抓到 logcat 实锤：`ClassCastException: BlendModeColorFilter cannot be cast to android.graphics.ColorFilter at FillContent.draw`——LineLottie 用 Compose 的 `ColorFilter.tint` 给 Lottie 动态属性 COLOR_FILTER 赋值，而 lottie-compose 6.6.10 该属性要求 `android.graphics.ColorFilter`（已对照官方 sources 核实）。批次 L 给声波空状态加染色后，一进录音页即闪退；批次 I 的打字指示器同走此路径（流式问答/Obsidian 检索中同样有风险）。
+
+修复：染色值改为 `PorterDuffColorFilter(tint.toArgb(), SRC_IN)`，全 App 所有 LineLottie 染色路径一并治愈。v1.2.3/v1.2.4 作废，不部署不分发。
+
 ## v1.2.4 (2026-11-06) 批次 M · 功能核查修复：全文检索解析对齐
 
 TP 要求核查"功能都能不能用"，遂在 ATP 上对 App 调用的全部接口做了一次实测扫查：会话（30 条）/会话详情/记忆（56 条）/第二大脑问答（DeepSeek 实时回答）/Obsidian 状态与问答（6640 笔记、真回答+来源）均正常；**唯独全文检索在 App 内恒为 0 条**——服务端返回 {utterances, memories} 结构，客户端却在读不存在的 `results` 字段。此前模拟器连不上生产 API，数据功能无法在冒烟中暴露此问题。
