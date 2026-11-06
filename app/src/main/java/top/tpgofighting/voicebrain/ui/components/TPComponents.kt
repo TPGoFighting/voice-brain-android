@@ -6,6 +6,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.luminance
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.MarkdownTypography
 import top.tpgofighting.voicebrain.R
@@ -120,9 +122,10 @@ fun TPBadge(
     variant: TPBadgeVariant = TPBadgeVariant.BLUE
 ) {
     val (bgColor, textColor, borderColor) = when (variant) {
-        TPBadgeVariant.BLUE -> Triple(TPAccentBlueLight, TPAccentBlue, TPAccentBlue)
+        // 批次 L 色彩纪律：原默认蓝/紫与黄+藏青品牌冲突，BLUE 收为藏青系、PURPLE 收为芥末系
+        TPBadgeVariant.BLUE -> Triple(Color(0xFFE8EDF5), TPNavyDark, TPNavyDark)
         TPBadgeVariant.GREEN -> Triple(TPAccentGreenLight, TPAccentGreen, TPAccentGreen)
-        TPBadgeVariant.PURPLE -> Triple(TPAccentPurpleLight, TPAccentPurple, TPAccentPurple)
+        TPBadgeVariant.PURPLE -> Triple(TPAccentYellowLight, Color(0xFFB45309), TPMustardYellowDark)
         TPBadgeVariant.YELLOW -> Triple(TPAccentYellowLight, Color(0xFFB45309), TPMustardYellowDark)
         TPBadgeVariant.DARK -> Triple(TPNavyDark, Color.White, TPNavyDark)
         TPBadgeVariant.OUTLINE -> Triple(Color.Transparent, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.outline)
@@ -333,12 +336,20 @@ fun TPLogoTile(size: Dp = 34.dp, modifier: Modifier = Modifier) {
 }
 
 /**
+ * 品牌强调色（主题感知）：浅色用藏青、深色用品牌黄。
+ * 取代散落各处的 Material 默认蓝（TPAccentBlue），保证深浅模式都成立。
+ */
+@Composable
+fun brandAccentColor(): Color =
+    if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) TPMustardYellow else TPNavyDark
+
+/**
  * 聊天尺度的 Markdown 字阶：mikepenz 默认拿 displayLarge/bodyLarge 渲染，
  * 在气泡里过大；这里统一到正文 14sp、标题 15–17sp 的对话尺度。
  */
 @Composable
 fun TPMarkdownTypography(): MarkdownTypography {
-    val body = TextStyle(fontSize = 14.sp, lineHeight = 21.sp)
+    val body = TextStyle(fontSize = 14.sp, lineHeight = 21.sp, textAlign = TextAlign.Start)
     return markdownTypography(
         h1 = TextStyle(fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold),
         h2 = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold),

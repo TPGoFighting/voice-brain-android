@@ -38,7 +38,8 @@ fun MinutesTab(
     onToggleViewMode: (Boolean) -> Unit,
     onPolishDraft: () -> Unit,
     onShowToast: (String) -> Unit,
-    onSetTemplate: (String) -> Unit = {}
+    onSetTemplate: (String) -> Unit = {},
+    onGoRecord: () -> Unit = {}
 ) {
     var showPersonaBottomSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -110,7 +111,8 @@ fun MinutesTab(
                     val generateInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                     Button(
                         onClick = onGenerateMinutes,
-                        enabled = !state.isGeneratingMinutes,
+                        // 无逐字稿时置灰：点了必然空转（PM 审查 P1），改为由空状态引导去录音
+                        enabled = !state.isGeneratingMinutes && (state.minutes != null || state.utterances.isNotEmpty()),
                         interactionSource = generateInteraction,
                         modifier = Modifier.height(36.dp).pressScale(generateInteraction),
                         shape = RoundedCornerShape(6.dp),
@@ -289,7 +291,37 @@ fun MinutesTab(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("暂未生成纪要，请先在实时录音页录音", fontSize = 12.sp, color = Color.Gray)
+                    // 与记忆页统一的三段式空状态：线条图形 + 说明 + 去录一段
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    ) {
+                        LineLottie(
+                            asset = "sound_wave.json",
+                            modifier = Modifier.width(120.dp).height(34.dp),
+                            tint = brandAccentColor()
+                        )
+                        Text("还没有纪要", fontSize = 14.sp, fontWeight = FontWeight.Black)
+                        Text(
+                            "录音结束后，AI 会把逐字稿提炼成纪要、决策与待办",
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        val goRecordInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                        Button(
+                            onClick = onGoRecord,
+                            interactionSource = goRecordInteraction,
+                            modifier = Modifier.pressScale(goRecordInteraction),
+                            shape = RoundedCornerShape(50),
+                            colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark),
+                            contentPadding = PaddingValues(horizontal = 22.dp, vertical = 10.dp)
+                        ) {
+                            Text("去录一段", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                        }
+                    }
                 }
             } else {
                 LazyColumn(

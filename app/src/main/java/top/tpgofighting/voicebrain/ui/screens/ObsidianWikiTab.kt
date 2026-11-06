@@ -62,7 +62,7 @@ fun ObsidianWikiTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Filled.AccountTree, contentDescription = null, tint = TPAccentPurple, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.AccountTree, contentDescription = null, tint = brandAccentColor(), modifier = Modifier.size(18.dp))
                     Text("Obsidian Vault & LMMWiki", fontSize = 13.sp, fontWeight = FontWeight.Black)
                 }
                 TPBadge(
@@ -98,16 +98,15 @@ fun ObsidianWikiTab(
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("笔记总数: ${state.obsidianStatus.totalNotes}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         Text("·", fontSize = 10.sp)
-                        Text("录音归档: ${state.obsidianStatus.syncedVoiceNotes}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TPAccentBlue)
+                        Text("录音归档: ${state.obsidianStatus.syncedVoiceNotes}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("状态未知", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            "重试",
+                            "点此重试",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TPAccentBlue,
+                            color = brandAccentColor(),
                             modifier = Modifier.clickable { onRefreshObsidianStatus() }
                         )
                     }
@@ -194,8 +193,8 @@ fun ObsidianWikiTab(
                                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                                     modifier = Modifier.padding(start = 2.dp)
                                 ) {
-                                    Icon(Lucide.Brain, contentDescription = null, modifier = Modifier.size(14.dp), tint = TPAccentBlue)
-                                    Text("Hermes Agent", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TPAccentBlue)
+                                    Icon(Lucide.Brain, contentDescription = null, modifier = Modifier.size(14.dp), tint = brandAccentColor())
+                                    Text("Hermes Agent", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Box(
@@ -285,7 +284,7 @@ fun ObsidianWikiTab(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(entity.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TPAccentBlue)
+                            Text(entity.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
                             TPBadge(text = entity.category, variant = TPBadgeVariant.BLUE)
                         }
                         Spacer(modifier = Modifier.height(4.dp))

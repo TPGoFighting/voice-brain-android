@@ -47,6 +47,7 @@ import com.composables.icons.lucide.Settings2
 import com.composables.icons.lucide.Sun
 import top.tpgofighting.voicebrain.service.KeepAliveHelper
 import top.tpgofighting.voicebrain.ui.components.TPCard
+import top.tpgofighting.voicebrain.ui.components.brandAccentColor
 import top.tpgofighting.voicebrain.ui.theme.TPAccentBlue
 import top.tpgofighting.voicebrain.ui.theme.TPMustardYellow
 import top.tpgofighting.voicebrain.ui.theme.TPNavyDark
@@ -238,15 +239,17 @@ private fun SettingsRow(
             Text(subtitle, fontSize = 10.sp, lineHeight = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (actionLabel != null) {
-            Box(
+            // 行内动作只是跳系统设置，降为文字按钮，不与主 CTA 抢权重（PM 审查 P2）
+            Text(
+                actionLabel,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black,
+                color = brandAccentColor(),
                 modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(TPMustardYellow)
+                    .clip(RoundedCornerShape(8.dp))
                     .clickable { onAction() }
-                    .padding(horizontal = 12.dp, vertical = 5.dp)
-            ) {
-                Text(actionLabel, fontSize = 11.sp, fontWeight = FontWeight.Black, color = TPNavyDark)
-            }
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+            )
         }
     }
 }

@@ -475,17 +475,17 @@ fun LiveWorkbenchTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(TPAccentBlueLight)
+                    .background(TPAccentYellowLight)
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(Icons.Filled.History, null, tint = TPAccentBlue, modifier = Modifier.size(14.dp))
+                Icon(Icons.Filled.History, null, tint = TPNavyDark, modifier = Modifier.size(14.dp))
                 Text(
                     text = "正在回看：${state.viewingSessionTitle}",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TPAccentBlue,
+                    color = TPNavyDark,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -518,7 +518,7 @@ fun LiveWorkbenchTab(
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
-                        color = TPAccentBlue
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -586,7 +586,7 @@ fun LiveWorkbenchTab(
                 Text(
                     text = state.diarizeStatus,
                     fontSize = 10.sp,
-                    color = TPAccentBlue,
+                    color = brandAccentColor(),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
@@ -631,10 +631,12 @@ fun LiveWorkbenchTab(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // 简笔画线条动画（LottieFiles 素材）：声波麦克风，替代静态图标
+                        // 简笔画线条动画：单色声波线（白色素材按主题染成藏青/品牌黄）。
+                        // 此前的渐变圆环素材会被读成 loading 转圈且与品牌冲突（PM 审查 P1）。
                         LineLottie(
-                            asset = "ai_voice.json",
-                            modifier = Modifier.size(64.dp)
+                            asset = "sound_wave.json",
+                            modifier = Modifier.width(120.dp).height(34.dp),
+                            tint = brandAccentColor()
                         )
                         Text(
                             text = "静候声音输入...",

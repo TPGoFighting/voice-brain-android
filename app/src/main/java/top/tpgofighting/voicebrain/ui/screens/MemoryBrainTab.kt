@@ -208,10 +208,11 @@ fun MemoryBrainTab(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             if (state.memories.isEmpty()) {
-                                // 简笔画线条动画（LottieFiles 素材，Lottie 播放）：麦克风声波
+                                // 简笔画线条动画：单色声波线按主题染色（与录音页空状态统一）
                                 LineLottie(
-                                    asset = "ai_voice.json",
-                                    modifier = Modifier.size(76.dp)
+                                    asset = "sound_wave.json",
+                                    modifier = Modifier.width(120.dp).height(34.dp),
+                                    tint = brandAccentColor()
                                 )
                                 Text(
                                     "还没有沉淀任何记忆",
@@ -529,8 +530,8 @@ fun ChatBubbleRow(
             horizontalArrangement = Arrangement.spacedBy(5.dp),
             modifier = Modifier.padding(start = 2.dp)
         ) {
-            Icon(Lucide.Brain, contentDescription = null, modifier = Modifier.size(14.dp), tint = TPAccentBlue)
-            Text(agentName, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TPAccentBlue)
+            Icon(Lucide.Brain, contentDescription = null, modifier = Modifier.size(14.dp), tint = brandAccentColor())
+            Text(agentName, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
             Text(msg.timestamp, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(modifier = Modifier.height(4.dp))

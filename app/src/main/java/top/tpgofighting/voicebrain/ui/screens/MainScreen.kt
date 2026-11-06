@@ -262,7 +262,8 @@ fun MainScreen(
                         onToggleViewMode = { viewModel.toggleMinutesViewMode(it) },
                         onPolishDraft = { viewModel.polishCurrentMinutes() },
                         onShowToast = { viewModel.showToast(it) },
-                        onSetTemplate = { viewModel.setMinutesTemplate(it) }
+                        onSetTemplate = { viewModel.setMinutesTemplate(it) },
+                        onGoRecord = { currentTab = NavigationTab.LIVE }
                     )
                 }
                 NavigationTab.MEMORY -> {
