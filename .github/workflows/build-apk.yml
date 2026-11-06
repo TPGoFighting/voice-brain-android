@@ -40,14 +40,20 @@ jobs:
         run: |
           ./gradlew assembleDebug assembleRelease --stacktrace
 
+      - name: Resolve Version
+        run: |
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Building version: $VERSION"
+
       - name: Verify APK Output
         run: |
           ls -la app/build/outputs/apk/debug/
           ls -la app/build/outputs/apk/release/
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/TPVoiceBrain-v1.0.3-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/TPVoiceBrain-v${APP_VERSION}-debug.apk"
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk dist/TPVoiceBrain-v1.0.3-release.apk
+            cp app/build/outputs/apk/release/app-release.apk "dist/TPVoiceBrain-v${APP_VERSION}-release.apk"
           fi
 
       - name: Upload APK Artifact
@@ -61,15 +67,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         with:
-          tag_name: v1.0.3
-          name: "TP Voice Brain Android Native v1.0.3"
+          tag_name: v${{ env.APP_VERSION }}
+          name: "TP Voice Brain Android Native v${{ env.APP_VERSION }}"
           body: |
-            ## TP Voice Brain Android 原生应用 (Jetpack Compose) v1.0.3 更新说明
+            ## TP Voice Brain Android 原生应用 (Jetpack Compose) v${{ env.APP_VERSION }} 更新说明
 
-            - 【ASR 断句判定自定义】工作台控制面板新增“断句停顿判定”选择器（500ms 紧凑 / 800ms 标准 / 1200ms 从容），动态同步服务端百炼 ASR 阈值，彻底解决自然说话与呼吸换气被过敏切句的问题。
-            - 【Tier 2 上下文纠错与就地替换】深度适配服务端 Qwen-Flash 上下文快修引擎，自动结合前文语境纠正同音错别字、消除口吃重复，原地异步置换不卡顿。
-            - 【悬挂连词连句缓冲】服务端与端侧协同，自动暂存“然后”、“但是”、“而且”等孤立连词并在下一句到达时平滑拼接。
-            - 【全链路流式高可用】强化 OkHttp 15s 保活 Ping-Pong 机制与断线自愈 15s 环形音频缓冲重发。
+            详见仓库 README 的版本更新记录。
           files: dist/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
