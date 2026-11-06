@@ -99,8 +99,19 @@ anchor 02-live.xml "开始录音" "live screen record button"
 
 # Drawer + settings page (batch J layout): hamburger opens the drawer with
 # history + settings entry; settings shows the recording group.
+dismiss_anr
 tap_tab "打开菜单" 02-live; sleep 2
 shot 02b-drawer; dump 02b-drawer
+if ! grep -q "历史会话" "$OUT/02b-drawer.xml" 2>/dev/null; then
+  # The launcher ANR dialog can reappear between the pre-tap dump and the
+  # tap itself, swallowing the hamburger tap (v1.2.5 run: dialog visible in
+  # 02b-drawer.png, drawer never opened, all later steps cascaded). Retry
+  # the open once after clearing the dialog before declaring failure.
+  note "drawer anchor missing; retrying drawer open once (ANR race)"
+  dismiss_anr; dump 02-live
+  tap_tab "打开菜单" 02-live; sleep 2
+  shot 02b-drawer; dump 02b-drawer
+fi
 anchor 02b-drawer.xml "历史会话" "drawer history section"
 tap_tab "设置" 02b-drawer; sleep 2
 shot 02c-settings; dump 02c-settings
