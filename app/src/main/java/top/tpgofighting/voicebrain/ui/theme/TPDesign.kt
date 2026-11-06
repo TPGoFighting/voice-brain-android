@@ -38,9 +38,9 @@ object TPType {
     val pageTitle = TextStyle(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold)
     val sectionTitle = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
     val rowTitle = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
-    val bodyMain = TextStyle(fontSize = 15.sp, lineHeight = 24.sp, fontWeight = FontWeight.Regular)
-    val body = TextStyle(fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Regular)
-    val bodySmall = TextStyle(fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Regular)
+    val bodyMain = TextStyle(fontSize = 15.sp, lineHeight = 24.sp, fontWeight = FontWeight.Normal)
+    val body = TextStyle(fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal)
+    val bodySmall = TextStyle(fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Normal)
     val label = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
-    val caption = TextStyle(fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.Regular)
+    val caption = TextStyle(fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.Normal)
 }
