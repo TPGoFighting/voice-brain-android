@@ -24,6 +24,11 @@ import java.io.File
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        /** 桌面小组件 / 快捷磁贴的直达录音标记：打开界面后立即开始录音 */
+        const val EXTRA_START_RECORDING = "top.tpgofighting.voicebrain.START_RECORDING"
+    }
+
     private val viewModel: MainViewModel by viewModels()
     private var pendingStartRecordingAfterPermission = false
 
@@ -62,6 +67,22 @@ class MainActivity : ComponentActivity() {
             TPVoiceBrainTheme {
                 MainScreen(viewModel = viewModel)
             }
+        }
+
+        handleStartRecordingIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleStartRecordingIntent(intent)
+    }
+
+    /** 小组件/磁贴直达：权限未授予时 startRecording 内部会先弹用途说明，不绕过确认 */
+    private fun handleStartRecordingIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_START_RECORDING, false) == true) {
+            intent.removeExtra(EXTRA_START_RECORDING)
+            viewModel.startRecording()
         }
     }
 

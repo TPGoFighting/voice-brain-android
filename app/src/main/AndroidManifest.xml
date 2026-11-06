@@ -24,6 +24,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -36,6 +37,34 @@
             android:name=".service.RecordingService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- 全局录音入口：下拉快捷设置磁贴 -->
+        <service
+            android:name=".widget.RecordingTileService"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="开始录音"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true" />
+        </service>
+
+        <!-- 全局录音入口：桌面小组件 -->
+        <receiver
+            android:name=".widget.RecordWidgetProvider"
+            android:exported="true"
+            android:label="录音豆 · 快速录音">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_record_info" />
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

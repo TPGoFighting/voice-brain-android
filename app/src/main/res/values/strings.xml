@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">TP Voice Brain</string>
+    <string name="widget_description">一键开始录音，打开录音豆并立即开录</string>
 </resources>
