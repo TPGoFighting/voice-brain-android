@@ -159,7 +159,9 @@ fun MainScreen(viewModel: MainViewModel) {
                         onOpenSession = { viewModel.loadSession(it) },
                         onRefreshSessions = { viewModel.refreshSessions() },
                         onBatteryExemption = { viewModel.requestBatteryExemption() },
-                        onAutoStartSettings = { viewModel.openAutoStartSettings() }
+                        onAutoStartSettings = { viewModel.openAutoStartSettings() },
+                        onConfirmMicPermission = { viewModel.confirmMicPermissionRequest() },
+                        onDismissMicRationale = { viewModel.dismissMicRationale() }
                     )
                 }
                 NavigationTab.MINUTES -> {
@@ -185,7 +187,8 @@ fun MainScreen(viewModel: MainViewModel) {
                         onOpenSession = {
                             viewModel.loadSession(it)
                             currentTab = NavigationTab.LIVE
-                        }
+                        },
+                        onGoRecord = { currentTab = NavigationTab.LIVE }
                     )
                 }
                 NavigationTab.OBSIDIAN -> {

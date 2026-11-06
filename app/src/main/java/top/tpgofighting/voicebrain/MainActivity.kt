@@ -30,8 +30,11 @@ class MainActivity : ComponentActivity() {
     private val requestAudioPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
+        viewModel.onMicPermissionResult(isGranted)
         if (isGranted) {
             viewModel.showToast("已获取麦克风录音权限")
+            // 通知权限只为录音前台服务通知服务，跟随首次录音一并申请，不在启动时打扰
+            checkAndRequestNotificationPermission()
             if (pendingStartRecordingAfterPermission) {
                 pendingStartRecordingAfterPermission = false
                 viewModel.startRecording()
@@ -50,8 +53,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        checkAndRequestAudioPermission()
-        checkAndRequestNotificationPermission()
+        // 权限一律按需申请，启动时不索权：麦克风在首次点「开始录音」时先弹
+        // 用途说明再调系统框；通知权限在首次录音获批后顺带申请。
         observeUiEvents()
         observeRecordingKeepScreenOn()
 
@@ -135,13 +138,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkAndRequestAudioPermission() {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECORD_AUDIO
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
-    }
 }

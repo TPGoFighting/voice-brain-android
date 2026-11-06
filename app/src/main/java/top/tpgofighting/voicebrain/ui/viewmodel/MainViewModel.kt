@@ -81,6 +81,10 @@ data class MainUiState(
     val isObsidianThinking: Boolean = false,
     val autoWriteBackEnabled: Boolean = true,
 
+    // 麦克风权限（按需申请：首次点开始先弹用途说明，被拒后给出恢复入口）
+    val micRationaleVisible: Boolean = false,
+    val micPermissionDenied: Boolean = false,
+
     // 后台保活状态
     val batteryExempt: Boolean = true,
 
@@ -214,6 +218,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         KeepAliveHelper.openAutoStartSettings(getApplication())
     }
 
+    /** 用户在用途说明半屏上确认后，才真正调起系统麦克风权限框 */
+    fun confirmMicPermissionRequest() {
+        _uiState.update { it.copy(micRationaleVisible = false) }
+        viewModelScope.launch {
+            _uiEvents.emit(MainUiEvent.RequestAudioPermission)
+        }
+    }
+
+    fun dismissMicRationale() {
+        _uiState.update { it.copy(micRationaleVisible = false) }
+    }
+
+    /** 系统权限框结果回告：被拒后录音页顶部显示「去设置开启」恢复卡 */
+    fun onMicPermissionResult(granted: Boolean) {
+        _uiState.update { it.copy(micPermissionDenied = !granted) }
+    }
+
     fun startRecording() {
         if (_uiState.value.isRecording) return
 
@@ -222,9 +243,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 android.Manifest.permission.RECORD_AUDIO
             ) != android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
-            viewModelScope.launch {
-                _uiEvents.emit(MainUiEvent.RequestAudioPermission)
-            }
+            // 不直接调系统权限框：先在录音页弹用途说明，用户确认后再申请
+            _uiState.update { it.copy(micRationaleVisible = true) }
             return
         }
 
@@ -238,7 +258,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 wsStatusConnected = false,
                 interimText = "fun-asr-realtime 感知层监听中...",
                 viewingSessionTitle = null,
-                volumeHistory = emptyList()
+                volumeHistory = emptyList(),
+                micPermissionDenied = false
             )
         }
 

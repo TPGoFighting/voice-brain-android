@@ -23,7 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,7 +61,9 @@ fun LiveWorkbenchTab(
     onOpenSession: (String) -> Unit = {},
     onRefreshSessions: () -> Unit = {},
     onBatteryExemption: () -> Unit = {},
-    onAutoStartSettings: () -> Unit = {}
+    onAutoStartSettings: () -> Unit = {},
+    onConfirmMicPermission: () -> Unit = {},
+    onDismissMicRationale: () -> Unit = {}
 ) {
     val listState = rememberLazyListState()
     var showDeviceMenu by remember { mutableStateOf(false) }
@@ -76,6 +82,39 @@ fun LiveWorkbenchTab(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // 0. 麦克风权限被拒后的恢复卡（系统框拒绝后只剩设置页一条路）
+        if (state.micPermissionDenied && !state.isRecording) {
+            val context = LocalContext.current
+            TPCard(
+                modifier = Modifier.fillMaxWidth(),
+                backgroundColor = MaterialTheme.colorScheme.surface
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("麦克风权限未开启", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                        Text(
+                            "没有麦克风权限无法录音，请在系统设置里为录音豆开启。",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(onClick = {
+                        val intent = Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null)
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                    }) {
+                        Text("去设置开启", fontSize = 12.sp, fontWeight = FontWeight.Black, color = TPAccentBlue)
+                    }
+                }
+            }
+        }
+
         // 1. 录音主控制面板 (Hero Panel)
         TPCard(
             modifier = Modifier.fillMaxWidth(),
@@ -642,6 +681,46 @@ fun LiveWorkbenchTab(
                 TextButton(onClick = { showArchive = false }) { Text("关闭") }
             }
         )
+    }
+
+    // 首次录音前的麦克风用途说明：讲清录音去向，确认后才调系统权限框
+    if (state.micRationaleVisible) {
+        ModalBottomSheet(onDismissRequest = onDismissMicRationale) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("开始录音前，先说明一下", fontSize = 15.sp, fontWeight = FontWeight.Black)
+                Text(
+                    "录音豆需要麦克风权限才能录音。录音只会发送到你自己的服务器（voice.tpgofighting.top）做实时转写，不经过任何第三方，也不会在后台偷偷录音——只有你点下开始、且页面显示录音中时才采集。",
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismissMicRationale,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("暂不", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onConfirmMicPermission,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark)
+                    ) {
+                        Text("继续，申请权限", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+        }
     }
 }
 
