@@ -120,7 +120,7 @@ fun MainScreen(viewModel: MainViewModel) {
             androidx.compose.animation.AnimatedContent(
                 targetState = currentTab,
                 transitionSpec = {
-                    androidx.compose.animation.togetherWith(
+                    androidx.compose.animation.ContentTransform(
                         androidx.compose.animation.fadeIn(
                             animationSpec = androidx.compose.animation.core.spring(
                                 dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
