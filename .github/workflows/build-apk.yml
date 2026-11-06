@@ -40,6 +40,9 @@ jobs:
         run: |
           ./gradlew assembleDebug assembleRelease --stacktrace
 
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
       - name: Resolve Version
         run: |
           VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
