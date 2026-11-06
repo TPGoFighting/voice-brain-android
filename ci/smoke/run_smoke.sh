@@ -55,6 +55,15 @@ adb shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1
 sleep 8
 shot 01-launch; dump 01-launch
 
+# Permissions are on-demand only (v1.1.2): no system permission dialog
+# may appear at launch. Before this fix the mic dialog popped up on the
+# very first frame, ahead of any explanation.
+if grep -q "permissioncontroller" "$OUT/01-launch.xml"; then
+  fail "system permission dialog shown at launch (permissions must be on-demand)"
+else
+  note "no permission dialog at launch"
+fi
+
 # Grant runtime permissions so every main screen is fully reachable.
 adb shell pm grant "$PKG" android.permission.RECORD_AUDIO 2>/dev/null || true
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
@@ -69,6 +78,17 @@ anchor 03-minutes.xml "结构化纪要与决策对账" "minutes screen title"
 tap_tab "记忆大脑" 03-minutes; sleep 3
 shot 04-memory; dump 04-memory
 anchor 04-memory.xml "全文检索" "memory screen search subtab"
+
+# Memory empty state (v1.1.2): with no memories the library must explain
+# itself and offer a way to record, not sit blank. When the API answered
+# with data the empty state legitimately does not appear.
+if grep -q "去录一段" "$OUT/04-memory.xml"; then
+  note "memory empty state shown with record call-to-action"
+elif adb logcat -d 2>/dev/null | grep -a "fetchMemories failed" | grep -qaE "Unable to resolve host|Connection reset|Failed to connect|timeout|Timeout"; then
+  fail "memories unfetchable from this network but no empty state was shown"
+else
+  note "memories present (or fetch still pending); empty-state check not applicable"
+fi
 
 tap_tab "Obsidian" 04-memory; sleep 3
 shot 05-obsidian; dump 05-obsidian
