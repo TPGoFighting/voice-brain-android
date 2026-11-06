@@ -166,6 +166,12 @@ fun ObsidianWikiTab(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                // 分工说明：与记忆页的录音问答区分开，一句话讲清
+                Text(
+                    "这里查的是整个 Obsidian 仓库的笔记正文；录音里说过什么，去「记忆大脑」页问。",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -202,7 +208,7 @@ fun ObsidianWikiTab(
                         value = queryText,
                         onValueChange = { queryText = it },
                         modifier = Modifier.weight(1f).height(46.dp),
-                        placeholder = { Text("向 Obsidian 知识库提问...", fontSize = 11.sp) },
+                        placeholder = { Text("查仓库笔记，如：点云论文笔记在哪", fontSize = 11.sp) },
                         shape = RoundedCornerShape(8.dp),
                         singleLine = true
                     )
