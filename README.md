@@ -63,6 +63,12 @@
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
+## v1.2.4 (2026-11-06) 批次 M · 功能核查修复：全文检索解析对齐
+
+TP 要求核查"功能都能不能用"，遂在 ATP 上对 App 调用的全部接口做了一次实测扫查：会话（30 条）/会话详情/记忆（56 条）/第二大脑问答（DeepSeek 实时回答）/Obsidian 状态与问答（6640 笔记、真回答+来源）均正常；**唯独全文检索在 App 内恒为 0 条**——服务端返回 {utterances, memories} 结构，客户端却在读不存在的 `results` 字段。此前模拟器连不上生产 API，数据功能无法在冒烟中暴露此问题。
+
+修复：解析改为服务端真实形状（parseSearchBody），并新增 SearchParseTest 单元测试锁定契约（真实形状样本 + 空结果），与 ObsidianStatusParseTest 同一套防线。
+
 ## v1.2.3 (2026-11-06) 批次 L · PM 审查整改
 
 按 AI 产品经理审查（v1.2.1）的问题单逐项整改（审查全文存档于工作区）：

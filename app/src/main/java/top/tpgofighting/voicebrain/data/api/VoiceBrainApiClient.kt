@@ -318,19 +318,7 @@ class VoiceBrainApiClient(
             if (!response.isSuccessful) {
                 return@withContext Result.failure(Exception("HTTP ${response.code}"))
             }
-            val obj = json.parseToJsonElement(respBody).jsonObject
-            val hits = obj["results"]?.jsonArray?.map { h ->
-                val ho = h.jsonObject
-                SearchHit(
-                    kind = ho["kind"]?.jsonPrimitive?.content ?: "transcript",
-                    sessionId = ho["sessionId"]?.jsonPrimitive?.content ?: "",
-                    sessionTitle = ho["sessionTitle"]?.jsonPrimitive?.content ?: "",
-                    stamp = ho["stamp"]?.jsonPrimitive?.content ?: "",
-                    text = ho["text"]?.jsonPrimitive?.content ?: "",
-                    category = ho["category"]?.jsonPrimitive?.content ?: ""
-                )
-            } ?: emptyList()
-            Result.success(hits)
+            Result.success(parseSearchBody(respBody))
         } catch (e: Exception) {
             Log.e(TAG, "search failed: ${e.message}", e)
             Result.failure(e)
@@ -542,6 +530,38 @@ private val obsidianStatusJson = Json { ignoreUnknownKeys = true }
  * agentStatus{status, notes}。字段缺失时给出诚实的 0 / false，
  * 绝不回退到任何编造的默认值。抽成独立函数供单元测试锁定映射。
  */
+/**
+ * 解析 /api/search 的响应体。服务端真实形状（2026-11-06 对照 ATP 实测）：
+ * {success, utterances:[{sessionId, sessionTitle, sessionTime, utteranceTime, text, matched}],
+ *  memories:[{id, content, category, tags}], terms:[...]}。
+ * 此前客户端误读不存在的 "results" 字段，导致 App 内全文检索永远 0 条——
+ * 本函数按真实形状解析，并由单元测试锁定契约。
+ */
+internal fun parseSearchBody(body: String): List<SearchHit> {
+    val obj = obsidianStatusJson.parseToJsonElement(body).jsonObject
+    val hits = mutableListOf<SearchHit>()
+    obj["utterances"]?.jsonArray?.forEach { h ->
+        val ho = h.jsonObject
+        hits += SearchHit(
+            kind = "transcript",
+            sessionId = ho["sessionId"]?.jsonPrimitive?.content ?: "",
+            sessionTitle = ho["sessionTitle"]?.jsonPrimitive?.content ?: "",
+            stamp = ho["sessionTime"]?.jsonPrimitive?.content ?: "",
+            text = ho["text"]?.jsonPrimitive?.content ?: ""
+        )
+    }
+    obj["memories"]?.jsonArray?.forEach { h ->
+        val ho = h.jsonObject
+        hits += SearchHit(
+            kind = "memory",
+            sessionId = ho["id"]?.jsonPrimitive?.content ?: "",
+            text = ho["content"]?.jsonPrimitive?.content ?: "",
+            category = ho["category"]?.jsonPrimitive?.content ?: ""
+        )
+    }
+    return hits
+}
+
 internal fun parseObsidianStatusBody(body: String): ObsidianStatus {
     val obj = obsidianStatusJson.parseToJsonElement(body).jsonObject
     val data = obj["data"]?.jsonObject ?: obj
