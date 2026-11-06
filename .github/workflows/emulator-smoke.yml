@@ -1,0 +1,47 @@
+name: Emulator Smoke Test
+
+# Black-box acceptance for a published release APK: boots an API 35
+# emulator (KVM on the Ubuntu runner), installs the APK from the chosen
+# GitHub Release, walks the four main tabs, and uploads screenshots +
+# UI dumps + logcat as the "smoke-results" artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "GitHub Release tag to test"
+        required: true
+        default: "v1.1.0"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ inputs.release_tag }}" --dir dl
+          APK="$(ls dl/*release.apk | head -1)"
+          echo "Testing APK: $APK"
+          cp "$APK" app-release.apk
+
+      - name: Run emulator smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: bash ci/smoke/run_smoke.sh
+
+      - name: Upload smoke results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results
+          path: smoke-out/
+          retention-days: 14
