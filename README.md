@@ -63,6 +63,10 @@
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
+## v1.1.8 (2026-11-06) 批次 F 完整版
+
+内容与 v1.1.7 相同。v1.1.7 发布时两个构建先后覆盖同一 Release，导航选中文字的深色修复（第二个提交）未能确定进入最终包，冒烟深色截图复核仍为旧色；本版单次构建重发，保证 Release 内容与仓库 HEAD 一致。
+
 ## v1.1.7 (2026-11-06) 第二轮审查修复 · 批次 F
 
 第一轮 14 项（v1.1.1–v1.1.6）修完后继续深挖，从深色巡检截图与代码里又挖出三处：
