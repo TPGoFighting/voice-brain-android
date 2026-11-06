@@ -49,7 +49,7 @@ fun ObsidianWikiTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // 1. Obsidian Vault 状态看板
@@ -64,7 +64,7 @@ fun ObsidianWikiTab(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(Lucide.Network, contentDescription = null, tint = brandAccentColor(), modifier = Modifier.size(18.dp))
-                    Text("Obsidian Vault", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                    Text("Obsidian Vault", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 TPBadge(
                     text = when {
@@ -101,15 +101,15 @@ fun ObsidianWikiTab(
             ) {
                 if (state.obsidianStatus.loaded) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("笔记总数: ${state.obsidianStatus.totalNotes}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        Text("·", fontSize = 10.sp)
-                        Text("录音归档: ${state.obsidianStatus.syncedVoiceNotes}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("笔记总数: ${state.obsidianStatus.totalNotes}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("·", fontSize = 11.sp)
+                        Text("录音归档: ${state.obsidianStatus.syncedVoiceNotes}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
                             "点此重试",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = brandAccentColor(),
                             modifier = Modifier.clickable { onRefreshObsidianStatus() }
@@ -122,7 +122,7 @@ fun ObsidianWikiTab(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("Hermes 反向追记", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("Hermes 反向追记", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Switch(
                         checked = state.autoWriteBackEnabled,
                         onCheckedChange = { onToggleAutoWriteBack() },
@@ -178,7 +178,7 @@ fun ObsidianWikiTab(
                 // 分工说明：与记忆页的录音问答区分开，一句话讲清
                 Text(
                     "查仓库笔记正文；录音内容去「记忆大脑」页问。",
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 // 示例问题（与第二大脑页对齐的首轮脚手架，批次 R 补齐）
@@ -208,7 +208,7 @@ fun ObsidianWikiTab(
                                     modifier = Modifier.padding(start = 2.dp)
                                 ) {
                                     Icon(Lucide.Brain, contentDescription = null, modifier = Modifier.size(14.dp), tint = brandAccentColor())
-                                    Text("Hermes Agent", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
+                                    Text("Hermes Agent", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Box(
@@ -270,7 +270,7 @@ fun ObsidianWikiTab(
             ) {
                 // 已同步录音材料笔记
                 item {
-                    Text("已同步录音笔记 (01-Raw/录音材料)", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    Text("已同步录音笔记 (01-Raw/录音材料)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
 
                 items(state.obsidianNotes, key = { it.path }) { note ->
@@ -284,14 +284,14 @@ fun ObsidianWikiTab(
                             TPBadge(text = note.persona, variant = TPBadgeVariant.YELLOW)
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(note.path, fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(note.path, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
                 // LMMWiki 核心实体
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("LMMWiki 核心实体与概念", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    Text("LMMWiki 核心实体与概念", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
 
                 items(state.obsidianEntities, key = { it.name }) { entity ->

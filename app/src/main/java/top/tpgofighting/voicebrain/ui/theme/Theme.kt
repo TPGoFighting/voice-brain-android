@@ -37,7 +37,7 @@ private val DarkColorScheme = darkColorScheme(
     onBackground = TPTextPrimaryDark,
     surface = TPCardDark,
     onSurface = TPTextPrimaryDark,
-    surfaceVariant = TPNavySurface,
+    surfaceVariant = TPDarkElev1,
     onSurfaceVariant = TPTextMutedDark,
     outline = TPBorderDark
 )

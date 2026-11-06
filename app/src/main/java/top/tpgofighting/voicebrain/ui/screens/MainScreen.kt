@@ -131,7 +131,7 @@ fun MainScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         TPLogoTile(size = 30.dp)
-                        Text("Voice Brain", fontSize = 15.sp, fontWeight = FontWeight.Black)
+                        Text("Voice Brain", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         TPBadge(text = uiState.currentPersona.badge, variant = TPBadgeVariant.YELLOW)
                     }
                 },
@@ -172,8 +172,8 @@ fun MainScreen(
                         label = {
                             Text(
                                 text = tab.label,
-                                fontSize = 10.sp,
-                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(
@@ -332,8 +332,8 @@ private fun AppDrawerSheet(
             ) {
                 TPLogoTile(size = 40.dp)
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Voice Brain", fontSize = 15.sp, fontWeight = FontWeight.Black)
-                    Text("AI 录音豆", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Voice Brain", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("AI 录音豆", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -364,7 +364,7 @@ private fun AppDrawerSheet(
                         Text(
                             tab.label,
                             fontSize = 14.sp,
-                            fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                             color = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -388,7 +388,7 @@ private fun AppDrawerSheet(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Icon(Lucide.History, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("历史会话", fontSize = 14.sp, fontWeight = FontWeight.Black)
+                    Text("历史会话", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -424,7 +424,7 @@ private fun AppDrawerSheet(
                             if (session.utteranceCount > 0) metaParts += "${session.utteranceCount} 句"
                             val meta = metaParts.joinToString(" · ")
                             if (meta.isNotBlank()) {
-                                Text(meta, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(meta, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -451,7 +451,7 @@ private fun AppDrawerSheet(
             Spacer(Modifier.height(12.dp))
             Text(
                 "voice.tpgofighting.top",
-                fontSize = 9.sp,
+                fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 12.dp)
             )

@@ -63,6 +63,20 @@
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
+## v1.3.x「大厂精修」（按《VoiceBrain-v1.3.0-大厂精修设计稿》+ 设计图实施，TP 2026-11-07 开工令）
+
+决策项按规格 §6 推荐执行：A 顶栏撤人设徽章（人设只活在纪要页）；B 录音设置以设置页为唯一真源；C 抽屉与底栏本版保留双轨、只打磨；D 录音坞不预留暂停位；E 纪要主按钮保留「重新生成」；F Obsidian 状态在页内一行化（顶栏副标题化留后续）；G 抽屉选中行浅黄填充 + 黄色指示条；H 表单选中态藏青实心 + 白字；I 纪要成稿统一 mikepenz 引擎。
+
+### v1.3.0 批次 S1 · 地基
+
+- 新增 `ui/theme/TPDesign.kt`：TPSpacing（4pt 标尺）/ TPRadius（6/10/14/20/28/999 六级）/ TPType（七级字阶）token 层
+- 深色四级 elevation 落色：dark-1 `#0E1626`（新）、dark-4 `#27364D`（新）；主题 surfaceVariant 深色改 dark-1 沉降区
+- TPCard 默认收编：圆角 10→14dp、描边改 onSurface @12% alpha（废除 45% 灰边）、阴影 2dp→0（非交互容器不带影）
+- TPBadge：9sp 等宽 → 11sp SemiBold（废除 9/10sp 的第一步）
+- 全 App 字号下限扫荡：42 处 9/10sp → 11sp；字重扫荡：44 处 FontWeight.Black → SemiBold（Black 纪律只留录音主按钮，S2 新录音坞处恢复）
+- 四个主页签页面边距 12dp → 16dp；紫色常量标记 Deprecated（下线第一步）
+- 冒烟脚本硬化（抽屉重试 + Launcher 强杀兜底）并回 main 分支
+
 ## v1.2.6 (2026-11-06) 批次 R · 三方 PM 验收整改收口
 
 v1.2.5 经三位独立 AI PM（IA/导航、Agent 体验、视觉/无障碍）验收：三份均为 PASS-WITH-NITS、无 FAIL。本批清掉全部 P1 与主要 P2：

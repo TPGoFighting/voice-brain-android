@@ -44,10 +44,10 @@ fun TPCard(
     modifier: Modifier = Modifier,
     backgroundColor: Color = MaterialTheme.colorScheme.surface,
     // 非交互容器只给一层淡描边定界，重描边留给可交互元素（VI 的新丑风描边语义）
-    borderColor: Color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+    borderColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
     borderWidth: Dp = 1.dp,
-    elevation: Dp = 2.dp,
-    cornerRadius: Dp = 10.dp,
+    elevation: Dp = 0.dp,
+    cornerRadius: Dp = 14.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Box(
@@ -109,7 +109,7 @@ fun TPButton(
                 text = text,
                 color = contentColor,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.Black
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
@@ -140,9 +140,8 @@ fun TPBadge(
         Text(
             text = text,
             color = textColor,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
@@ -225,7 +224,7 @@ fun TPMarkdownView(
                     Text(
                         text = trimmed.removePrefix("## "),
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.Black,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
                     )
@@ -234,7 +233,7 @@ fun TPMarkdownView(
                     Text(
                         text = trimmed.removePrefix("# "),
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.Black,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(top = 12.dp, bottom = 6.dp)
                     )

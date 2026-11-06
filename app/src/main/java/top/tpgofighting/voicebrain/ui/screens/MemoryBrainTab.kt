@@ -58,7 +58,7 @@ fun MemoryBrainTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // 1. 移动端双栏切页 (记忆库 VS 问问第二大脑 Agent)
@@ -170,7 +170,7 @@ fun MemoryBrainTab(
                         Text(
                             text = cat,
                             fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                             color = if (isSelected) TPNavyDark else MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -216,7 +216,7 @@ fun MemoryBrainTab(
                                 Text(
                                     "还没有沉淀任何记忆",
                                     fontSize = 14.sp,
-                                    fontWeight = FontWeight.Black,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
@@ -233,7 +233,7 @@ fun MemoryBrainTab(
                                     shape = RoundedCornerShape(999.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark)
                                 ) {
-                                    Text("去录一段", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                                    Text("去录一段", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             } else {
                                 Text(
@@ -262,7 +262,7 @@ fun MemoryBrainTab(
                 // 分工说明：与 Obsidian 页的仓库问答区分开，一句话讲清
                 Text(
                     "这里问的是你的录音和记忆；想查整个 Obsidian 仓库的笔记，去 Obsidian 页问。",
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
@@ -370,7 +370,7 @@ fun MemoryBrainTab(
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = TPNavyDark, contentColor = TPMustardYellow)
                     ) {
-                        Text("检索", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                        Text("检索", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -408,7 +408,7 @@ fun MemoryBrainTab(
                                     if (hit.sessionTitle.isNotBlank()) {
                                         Text(
                                             text = hit.sessionTitle,
-                                            fontSize = 10.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1
@@ -425,7 +425,7 @@ fun MemoryBrainTab(
                                 if (hit.kind == "transcript") {
                                     Text(
                                         text = "点按在工作台打开这段录音",
-                                        fontSize = 9.sp,
+                                        fontSize = 11.sp,
                                         color = TPAccentBlue,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -481,7 +481,7 @@ fun MemoryCardItem(item: MemoryItem) {
                             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
                             .padding(horizontal = 4.dp, vertical = 2.dp)
                     ) {
-                        Text("#$tag", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("#$tag", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -533,7 +533,7 @@ fun ChatBubbleRow(
             modifier = Modifier.padding(start = 2.dp)
         ) {
             Icon(Lucide.Brain, contentDescription = null, modifier = Modifier.size(14.dp), tint = brandAccentColor())
-            Text(agentName, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
+            Text(agentName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
             Text(msg.timestamp, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -560,7 +560,7 @@ fun ChatBubbleRow(
                         Spacer(modifier = Modifier.height(9.dp))
                         Text(
                             "来源",
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

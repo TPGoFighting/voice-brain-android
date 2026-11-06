@@ -47,7 +47,7 @@ fun MinutesTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // 1. Koboyo 人设胶囊卡片
@@ -82,14 +82,14 @@ fun MinutesTab(
                             Text(
                                 text = state.currentPersona.name,
                                 fontSize = 13.sp,
-                                fontWeight = FontWeight.Black,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             TPBadge(text = state.currentPersona.badge, variant = TPBadgeVariant.YELLOW)
                         }
                         Text(
                             text = state.currentPersona.title,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -122,7 +122,7 @@ fun MinutesTab(
                         if (state.isGeneratingMinutes) {
                             CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp, color = TPNavyDark)
                         } else {
-                            Text(if (state.minutes == null) "生成纪要" else "重新生成", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                            Text(if (state.minutes == null) "生成纪要" else "重新生成", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -167,8 +167,8 @@ fun MinutesTab(
                     ) {
                         Text(
                             text = tpl.label,
-                            fontSize = 10.sp,
-                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                             color = if (isSelected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -179,7 +179,7 @@ fun MinutesTab(
             if (currentTpl != null) {
                 Text(
                     text = currentTpl.hint,
-                    fontSize = 9.sp,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 3.dp)
                 )
@@ -234,7 +234,7 @@ fun MinutesTab(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("正式汇报草稿 (Markdown 深度解析)", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    Text("正式汇报草稿 (Markdown 深度解析)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         IconButton(
                             onClick = onPolishDraft,
@@ -301,7 +301,7 @@ fun MinutesTab(
                             modifier = Modifier.width(148.dp).height(40.dp),
                             color = brandAccentColor()
                         )
-                        Text("还没有纪要", fontSize = 14.sp, fontWeight = FontWeight.Black)
+                        Text("还没有纪要", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         Text(
                             "录音结束后，AI 会把逐字稿提炼成纪要、决策与待办",
                             fontSize = 11.sp,
@@ -318,7 +318,7 @@ fun MinutesTab(
                             colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark),
                             contentPadding = PaddingValues(horizontal = 22.dp, vertical = 10.dp)
                         ) {
-                            Text("去录一段", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                            Text("去录一段", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -339,7 +339,7 @@ fun MinutesTab(
                                 Text(
                                     text = minutes.title,
                                     fontSize = 14.sp,
-                                    fontWeight = FontWeight.Black,
+                                    fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.weight(1f)
                                 )
                                 TPBadge(text = "${minutes.templateLabel}模板", variant = TPBadgeVariant.YELLOW)
@@ -353,7 +353,7 @@ fun MinutesTab(
                         TPCard(modifier = Modifier.fillMaxWidth()) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Icon(Icons.Filled.ElectricBolt, contentDescription = null, tint = TPMustardYellowDark, modifier = Modifier.size(18.dp))
-                                Text("30秒高管速览 (TL;DR)", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                                Text("30秒高管速览 (TL;DR)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             val items = minutes?.tldr ?: emptyList()
@@ -374,7 +374,7 @@ fun MinutesTab(
                         TPCard(modifier = Modifier.fillMaxWidth()) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Icon(Icons.Filled.Verified, contentDescription = null, tint = brandAccentColor(), modifier = Modifier.size(18.dp))
-                                Text("明确敲定的关键决议 (Decisions)", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                                Text("明确敲定的关键决议 (Decisions)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             val decs = minutes?.decisions ?: emptyList()
@@ -396,7 +396,7 @@ fun MinutesTab(
                         TPCard(modifier = Modifier.fillMaxWidth()) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Icon(Icons.Filled.Checklist, contentDescription = null, tint = TPAccentGreen, modifier = Modifier.size(18.dp))
-                                Text("落地行动项 (Action Items)", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                                Text("落地行动项 (Action Items)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             val todos = minutes?.actionItems ?: emptyList()
@@ -415,7 +415,7 @@ fun MinutesTab(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(todo.task, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                                        Text("负责: ${todo.assignee} · 优先级: ${todo.priority}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("负责: ${todo.assignee} · 优先级: ${todo.priority}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     TPBadge(text = todo.status, variant = TPBadgeVariant.PURPLE)
                                 }
@@ -442,7 +442,7 @@ fun MinutesTab(
                 Text(
                     text = "选择 Koboyo 认知角色人设",
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Black
+                    fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     text = "每个角色拥有独立的认知世界观与提炼侧重点，做出来的 AI 总结完全不同：",
@@ -482,14 +482,14 @@ fun MinutesTab(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(p.name, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                                        Text(p.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                         TPBadge(text = p.badge, variant = if (isSelected) TPBadgeVariant.DARK else TPBadgeVariant.YELLOW)
                                     }
                                     if (isSelected) {
                                         Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = TPMustardYellowDark, modifier = Modifier.size(18.dp))
                                     }
                                 }
-                                Text(p.title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
+                                Text(p.title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
                                 Text(p.description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }

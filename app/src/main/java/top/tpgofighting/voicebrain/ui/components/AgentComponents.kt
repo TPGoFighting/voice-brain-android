@@ -224,13 +224,13 @@ fun AgentSourceRow(
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     text = title.ifBlank { "历史录音" },
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = TPAccentBlue
                 )
                 Text(
                     text = "「${quote.take(80)}」",
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     lineHeight = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

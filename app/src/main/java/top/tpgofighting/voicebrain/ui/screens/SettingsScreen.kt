@@ -83,7 +83,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置", fontSize = 16.sp, fontWeight = FontWeight.Black) },
+                title = { Text("设置", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Lucide.ArrowLeft, contentDescription = "返回", modifier = Modifier.size(20.dp))
@@ -193,7 +193,7 @@ fun SettingsScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "开源组件：Lucide 图标（ISC）· Airbnb Lottie、mikepenz Markdown、Haze（Apache-2.0）· 线条动画素材来自 LottieFiles（Simple License）",
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         lineHeight = 15.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -209,7 +209,7 @@ private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
         Text(
             title,
             fontSize = 11.sp,
-            fontWeight = FontWeight.Black,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp)
         )
@@ -237,14 +237,14 @@ private fun SettingsRow(
         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = brandAccentColor())
         Column(modifier = Modifier.weight(1f)) {
             Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, fontSize = 10.sp, lineHeight = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(subtitle, fontSize = 11.sp, lineHeight = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (actionLabel != null) {
             // 行内动作只是跳系统设置，降为文字按钮，不与主 CTA 抢权重（PM 审查 P2）
             Text(
                 actionLabel,
                 fontSize = 12.sp,
-                fontWeight = FontWeight.Black,
+                fontWeight = FontWeight.SemiBold,
                 color = brandAccentColor(),
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
@@ -272,7 +272,7 @@ private fun SelectChip(label: String, selected: Boolean, onClick: () -> Unit) {
         Text(
             label,
             fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             color = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurface
         )
     }
@@ -305,7 +305,7 @@ private fun ThemeChip(label: String, icon: ImageVector, selected: Boolean, onCli
             Text(
                 label,
                 fontSize = 11.sp,
-                fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                 color = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurface
             )
         }

@@ -90,7 +90,7 @@ fun LiveWorkbenchTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // 0. 麦克风权限被拒后的恢复卡（系统框拒绝后只剩设置页一条路）
@@ -106,10 +106,10 @@ fun LiveWorkbenchTab(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("麦克风权限未开启", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                        Text("麦克风权限未开启", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         Text(
                             "没有麦克风权限无法录音，请在系统设置里为录音豆开启。",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -120,7 +120,7 @@ fun LiveWorkbenchTab(
                         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         context.startActivity(intent)
                     }) {
-                        Text("去设置开启", fontSize = 12.sp, fontWeight = FontWeight.Black, color = brandAccentColor())
+                        Text("去设置开启", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = brandAccentColor())
                     }
                 }
             }
@@ -187,7 +187,7 @@ fun LiveWorkbenchTab(
                     )
                     Text(
                         text = if (state.isRecording) "停止并保存" else "开始录音",
-                        fontWeight = FontWeight.Black,
+                        fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
                     )
                 }
@@ -354,8 +354,8 @@ fun LiveWorkbenchTab(
                     ) {
                         Text(
                             text = label,
-                            fontSize = 10.sp,
-                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                             color = if (isSelected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -375,7 +375,7 @@ fun LiveWorkbenchTab(
                         val kb = state.totalBytes / 1024f
                         if (kb < 1024f) "已录 %.1f KB".format(kb) else "已录 %.1f MB".format(kb / 1024f)
                     } else "尚未录音",
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
@@ -426,15 +426,15 @@ fun LiveWorkbenchTab(
                     )
                     Text(
                         text = "未加入电池白名单，锁屏长录可能被系统杀后台",
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = TPNavyDark,
                         modifier = Modifier.weight(1f)
                     )
                     Text(
                         text = "电池豁免",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = TPNavyDark,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
@@ -445,8 +445,8 @@ fun LiveWorkbenchTab(
                     )
                     Text(
                         text = "自启动",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = TPNavyDark,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
@@ -457,7 +457,7 @@ fun LiveWorkbenchTab(
                     )
                     Text(
                         text = "知道了",
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = TPWarningDark,
                         modifier = Modifier
@@ -510,7 +510,7 @@ fun LiveWorkbenchTab(
                     Text(
                         text = "实时转写",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Black,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
@@ -538,8 +538,8 @@ fun LiveWorkbenchTab(
                             ) {
                                 Text(
                                     text = label,
-                                    fontSize = 10.sp,
-                                    fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                                     color = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -561,7 +561,7 @@ fun LiveWorkbenchTab(
                             }
                             Text(
                                 text = if (state.isDiarizing) "分离中" else "说话人分离",
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -576,7 +576,7 @@ fun LiveWorkbenchTab(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                             Icon(Icons.Filled.FolderOpen, null, Modifier.size(12.dp))
-                            Text(text = "归档", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "归档", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -585,7 +585,7 @@ fun LiveWorkbenchTab(
             if (state.isDiarizing && state.diarizeStatus.isNotBlank()) {
                 Text(
                     text = state.diarizeStatus,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     color = brandAccentColor(),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 6.dp)
@@ -645,7 +645,7 @@ fun LiveWorkbenchTab(
                         )
                         Text(
                             text = "点击上方开始录音；插上 DJI 接收器会自动优选领夹麦",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             color = Color.Gray
                         )
                     }
@@ -693,7 +693,7 @@ fun LiveWorkbenchTab(
                     Text(
                         text = "以此生成【${state.currentPersona.name}】结构化纪要",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Black
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -704,7 +704,7 @@ fun LiveWorkbenchTab(
     if (showArchive) {
         AlertDialog(
             onDismissRequest = { showArchive = false },
-            title = { Text("历史会话归档", fontSize = 15.sp, fontWeight = FontWeight.Black) },
+            title = { Text("历史会话归档", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) },
             text = {
                 if (state.isLoadingSessions) {
                     // 骨架屏：三行会话占位 + 呼吸式透明度脉动（手写 shimmer，不引额外动效库）
@@ -761,7 +761,7 @@ fun LiveWorkbenchTab(
                                 )
                                 Text(
                                     text = "${session.stamp.take(16).replace("T", " ")} · ${session.utteranceCount} 句",
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -784,7 +784,7 @@ fun LiveWorkbenchTab(
                     .padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("开始录音前，先说明一下", fontSize = 15.sp, fontWeight = FontWeight.Black)
+                Text("开始录音前，先说明一下", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 Text(
                     "录音豆需要麦克风权限才能录音。录音只会发送到你自己的服务器（voice.tpgofighting.top）做实时转写，不经过任何第三方，也不会在后台偷偷录音——只有你点下开始、且页面显示录音中时才采集。",
                     fontSize = 12.sp,
@@ -809,7 +809,7 @@ fun LiveWorkbenchTab(
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark)
                     ) {
-                        Text("继续，申请权限", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                        Text("继续，申请权限", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -841,7 +841,7 @@ fun UtteranceItemRow(utterance: Utterance, showCleansed: Boolean = false) {
                     TPBadge(text = "#${utterance.id}", variant = TPBadgeVariant.YELLOW)
                     Text(
                         text = utterance.time,
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -853,7 +853,7 @@ fun UtteranceItemRow(utterance: Utterance, showCleansed: Boolean = false) {
                     )
                     Text(
                         text = utterance.speaker,
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
