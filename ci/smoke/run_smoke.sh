@@ -45,6 +45,15 @@ dismiss_anr() { # emulator launchers occasionally ANR under swiftshader; the
       return 0
     fi
   done
+  # "Wait" did not unwedge the launcher (tight ANR loop, seen on the v1.2.5
+  # hardened run: 7+ Wait taps, dialog kept owning every dump). Force-stop
+  # the launcher process itself; the app under test is launched via am and
+  # does not need the launcher, and a fresh launcher rarely re-wedges.
+  if grep -q "isn.t responding" "$f" 2>/dev/null; then
+    note "launcher ANR loop persists; force-stopping launcher"
+    adb shell am force-stop com.google.android.apps.nexuslauncher 2>/dev/null || true
+    sleep 3
+  fi
 }
 tap_tab() { # <tab label> <dump name the label is read from>
   local coords
