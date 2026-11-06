@@ -120,19 +120,22 @@ fun MainScreen(viewModel: MainViewModel) {
             androidx.compose.animation.AnimatedContent(
                 targetState = currentTab,
                 transitionSpec = {
-                    (androidx.compose.animation.fadeIn(
-                        animationSpec = androidx.compose.animation.core.spring(
-                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-                        )
-                    ) + androidx.compose.animation.slideInHorizontally(
-                        animationSpec = androidx.compose.animation.core.spring(
-                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    androidx.compose.animation.togetherWith(
+                        androidx.compose.animation.fadeIn(
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                            )
+                        ) + androidx.compose.animation.slideInHorizontally(
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                            ),
+                            initialOffsetX = { if (targetState.ordinal > initialState.ordinal) 60 else -60 }
                         ),
-                        initialOffsetX = { if (targetState.ordinal > initialState.ordinal) 60 else -60 }
-                    )) togetherWith androidx.compose.animation.fadeOut(
-                        animationSpec = androidx.compose.animation.core.tween(120)
+                        androidx.compose.animation.fadeOut(
+                            animationSpec = androidx.compose.animation.core.tween(120)
+                        )
                     )
                 },
                 label = "tabTransition"

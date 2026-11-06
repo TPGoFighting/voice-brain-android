@@ -209,8 +209,13 @@ class RecordingService : Service() {
                 // 追踪图标可选，失败不阻断
             }
             b.setStyle(style as Notification.Style)
-            b.setRequestPromotedOngoing(true)
-            b.setShortCriticalText("录音中")
+            // API 36 新增方法在 compileSdk 35 下不存在符号，必须反射调用
+            Notification.Builder::class.java
+                .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+                .invoke(b, true)
+            Notification.Builder::class.java
+                .getMethod("setShortCriticalText", CharSequence::class.java)
+                .invoke(b, "录音中" as CharSequence)
             Log.i(TAG, "Live Updates promotion applied (ProgressStyle + promoted ongoing)")
             b.build()
         } catch (e: Exception) {
