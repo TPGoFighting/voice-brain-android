@@ -18,6 +18,9 @@ fail() { FAILURES="${FAILURES}\n- $1"; note "FAIL: $1"; }
 
 shot() { adb exec-out screencap -p > "$OUT/$1.png" 2>/dev/null || note "screencap $1 failed"; }
 dump() {
+  # A looping launcher ANR dialog can reappear between steps and swallow a
+  # tap, then own the next dump. Clear it before every single dump.
+  dismiss_anr
   adb shell uiautomator dump /sdcard/dump.xml >/dev/null 2>&1
   adb pull /sdcard/dump.xml "$OUT/$1.xml" >/dev/null 2>&1 || note "dump $1 failed"
 }
@@ -142,6 +145,7 @@ sleep 3
 adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
 adb shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1
 sleep 6
+dismiss_anr
 shot 06-dark-live; dump 06-dark-live
 anchor 06-dark-live.xml "开始录音" "dark mode live screen record button"
 tap_tab "纪要决策" 06-dark-live; sleep 3
