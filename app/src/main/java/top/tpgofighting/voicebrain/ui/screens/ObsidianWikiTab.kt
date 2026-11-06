@@ -186,9 +186,9 @@ fun ObsidianWikiTab(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AgentSuggestionChip("仓库里最近在更新什么主题") { onAskObsidian("仓库里最近在更新什么主题") }
-                    AgentSuggestionChip("LLM-Wiki 的核心概念是什么") { onAskObsidian("LLM-Wiki 的核心概念是什么") }
-                    AgentSuggestionChip("我的项目笔记里有哪些待办") { onAskObsidian("我的项目笔记里有哪些待办") }
+                    AgentSuggestionChip(text = "仓库里最近在更新什么主题", onClick = { onAskObsidian("仓库里最近在更新什么主题") })
+                    AgentSuggestionChip(text = "LLM-Wiki 的核心概念是什么", onClick = { onAskObsidian("LLM-Wiki 的核心概念是什么") })
+                    AgentSuggestionChip(text = "我的项目笔记里有哪些待办", onClick = { onAskObsidian("我的项目笔记里有哪些待办") })
                 }
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
