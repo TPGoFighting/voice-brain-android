@@ -91,6 +91,7 @@ fun MainScreen(
             onToggleCleansed = { viewModel.toggleShowCleansed(it) },
             onBatteryExemption = { viewModel.requestBatteryExemption() },
             onAutoStartSettings = { viewModel.openAutoStartSettings() },
+            onOpenHistory = { showSettings = false; scope.launch { drawerState.open() } },
             onBack = { showSettings = false }
         )
         return
@@ -388,9 +389,6 @@ private fun AppDrawerSheet(
                 ) {
                     Icon(Lucide.History, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("历史会话", fontSize = 14.sp, fontWeight = FontWeight.Black)
-                }
-                IconButton(onClick = onRefreshSessions, modifier = Modifier.size(32.dp)) {
-                    Icon(Lucide.RefreshCw, contentDescription = "刷新会话", modifier = Modifier.size(15.dp))
                 }
             }
             Spacer(Modifier.height(8.dp))

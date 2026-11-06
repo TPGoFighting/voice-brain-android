@@ -339,6 +339,31 @@ fun TPLogoTile(size: Dp = 34.dp, modifier: Modifier = Modifier) {
  * 品牌强调色（主题感知）：浅色用藏青、深色用品牌黄。
  * 取代散落各处的 Material 默认蓝（TPAccentBlue），保证深浅模式都成立。
  */
+/** 空状态声波字形（批次 R）：静态线条柱阵列，简笔画风、任意帧都是完整图形；
+ * 取代 sound_wave Lottie——其 trim 动画在静帧只露一小段，视觉分量近乎标点。 */
+@Composable
+fun WaveGlyph(
+    modifier: Modifier = Modifier,
+    color: Color = brandAccentColor()
+) {
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val bars = 30
+        val barW = 3.dp.toPx()
+        val gap = (size.width - bars * barW) / (bars - 1)
+        for (i in 0 until bars) {
+            val t = i.toFloat() / (bars - 1)
+            val env = kotlin.math.sin(t * kotlin.math.PI).toFloat()
+            val h = size.height * (0.18f + 0.72f * env * (0.55f + 0.45f * kotlin.math.sin(t * 21f).toFloat().let { if (it < 0) -it else it }))
+            drawRoundRect(
+                color = color,
+                topLeft = androidx.compose.ui.geometry.Offset(i * (barW + gap), (size.height - h) / 2f),
+                size = androidx.compose.ui.geometry.Size(barW, h),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barW / 2f, barW / 2f)
+            )
+        }
+    }
+}
+
 @Composable
 fun brandAccentColor(): Color =
     if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) TPMustardYellow else TPNavyDark

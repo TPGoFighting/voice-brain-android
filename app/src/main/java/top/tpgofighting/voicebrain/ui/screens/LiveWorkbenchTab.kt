@@ -120,7 +120,7 @@ fun LiveWorkbenchTab(
                         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         context.startActivity(intent)
                     }) {
-                        Text("去设置开启", fontSize = 12.sp, fontWeight = FontWeight.Black, color = TPAccentBlue)
+                        Text("去设置开启", fontSize = 12.sp, fontWeight = FontWeight.Black, color = brandAccentColor())
                     }
                 }
             }
@@ -633,10 +633,9 @@ fun LiveWorkbenchTab(
                     ) {
                         // 简笔画线条动画：单色声波线（白色素材按主题染成藏青/品牌黄）。
                         // 此前的渐变圆环素材会被读成 loading 转圈且与品牌冲突（PM 审查 P1）。
-                        LineLottie(
-                            asset = "sound_wave.json",
-                            modifier = Modifier.width(120.dp).height(34.dp),
-                            tint = brandAccentColor()
+                        WaveGlyph(
+                            modifier = Modifier.width(148.dp).height(40.dp),
+                            color = brandAccentColor()
                         )
                         Text(
                             text = "静候声音输入...",

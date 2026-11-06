@@ -63,6 +63,18 @@
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
+## v1.2.6 (2026-11-06) 批次 R · 三方 PM 验收整改收口
+
+v1.2.5 经三位独立 AI PM（IA/导航、Agent 体验、视觉/无障碍）验收：三份均为 PASS-WITH-NITS、无 FAIL。本批清掉全部 P1 与主要 P2：
+
+- 视觉 P1：设置页 6 个行首图标仍为默认蓝 #2563EB（PM 像素采样实证）→ 统一 brandAccentColor
+- 视觉 P2：主题层 surfaceVariant 由淡蓝 #EFF6FF 改中性 #EEF1F5（全 App 未选中态填充去蓝）；空状态声波 Lottie 是 trim 动画、静帧只露约 13dp 墨迹 → 新增静态 WaveGlyph 线条柱阵列，三页空状态统一；记忆页空状态标题色/字重与 CTA 圆角对齐纪要页（胶囊）
+- IA P1：设置页「历史会话」由只报数的状态行改为真实入口（打开 → 关闭设置并拉开抽屉，抽屉打开即自动刷新）
+- Agent P2：Hermes 问候语与同屏 scope 提示自相矛盾（宣称查录音材料）→ 重写为仓库口径并去掉 RAG/多跳术语；第二大脑问候语在零数据时仍宣称「已接入全部录音」→ 改为不预设数据的表述；Obsidian 状态副标题随连接状态变化（未知时不再写「实时同步」）；Hermes 页补 3 个示例问题 chips，与第二大脑页脚手架对齐
+- 两页发送钮在空输入时改为中性未激活态，不再全激活样式
+- Obsidian 页头实心 AccountTree 图标 → Lucide Network 线性图标；标题去掉实现名 LMMWiki；scope 说明缩短消除孤字行；抽屉历史区删除无标签的刷新图标钮（打开抽屉已自动刷新）
+- 留待 v1.3.0 结构处理（设计稿已覆盖）：抽屉/底栏导航重复与历史置顶、录音设置双入口归一、顶栏人设徽章去留、命名统一——均待 TP 裁定
+
 ## v1.2.5 (2026-11-06) 批次 N · 热修复：Lottie 染色闪退
 
 v1.2.4 冒烟全红并抓到 logcat 实锤：`ClassCastException: BlendModeColorFilter cannot be cast to android.graphics.ColorFilter at FillContent.draw`——LineLottie 用 Compose 的 `ColorFilter.tint` 给 Lottie 动态属性 COLOR_FILTER 赋值，而 lottie-compose 6.6.10 该属性要求 `android.graphics.ColorFilter`（已对照官方 sources 核实）。批次 L 给声波空状态加染色后，一进录音页即闪退；批次 I 的打字指示器同走此路径（流式问答/Obsidian 检索中同样有风险）。

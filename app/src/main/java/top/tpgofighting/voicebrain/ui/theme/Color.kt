@@ -16,6 +16,8 @@ val TPBackgroundDark = Color(0xFF090D16)
 
 val TPAccentBlue = Color(0xFF2563EB)
 val TPAccentBlueLight = Color(0xFFEFF6FF)
+/** 中性浅填充（未选中态/轨道/下拉底）：替代淡蓝 #EFF6FF，批次 R 按 PM 采样整改 */
+val TPNeutralFill = Color(0xFFEEF1F5)
 val TPAccentPurple = Color(0xFF8B5CF6)
 val TPAccentPurpleLight = Color(0xFFF5F3FF)
 val TPAccentGreen = Color(0xFF10B981)

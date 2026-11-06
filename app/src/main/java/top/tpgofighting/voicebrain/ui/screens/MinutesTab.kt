@@ -297,10 +297,9 @@ fun MinutesTab(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(horizontal = 32.dp)
                     ) {
-                        LineLottie(
-                            asset = "sound_wave.json",
-                            modifier = Modifier.width(120.dp).height(34.dp),
-                            tint = brandAccentColor()
+                        WaveGlyph(
+                            modifier = Modifier.width(148.dp).height(40.dp),
+                            color = brandAccentColor()
                         )
                         Text("还没有纪要", fontSize = 14.sp, fontWeight = FontWeight.Black)
                         Text(
@@ -374,7 +373,7 @@ fun MinutesTab(
                     item {
                         TPCard(modifier = Modifier.fillMaxWidth()) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Filled.Verified, contentDescription = null, tint = TPAccentBlue, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Filled.Verified, contentDescription = null, tint = brandAccentColor(), modifier = Modifier.size(18.dp))
                                 Text("明确敲定的关键决议 (Decisions)", fontSize = 13.sp, fontWeight = FontWeight.Black)
                             }
                             Spacer(modifier = Modifier.height(6.dp))
@@ -490,7 +489,7 @@ fun MinutesTab(
                                         Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = TPMustardYellowDark, modifier = Modifier.size(18.dp))
                                     }
                                 }
-                                Text(p.title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TPAccentBlue)
+                                Text(p.title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
                                 Text(p.description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }

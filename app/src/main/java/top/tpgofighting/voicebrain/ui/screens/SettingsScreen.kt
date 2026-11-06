@@ -67,6 +67,7 @@ fun SettingsScreen(
     onToggleCleansed: (Boolean) -> Unit,
     onBatteryExemption: () -> Unit,
     onAutoStartSettings: () -> Unit,
+    onOpenHistory: () -> Unit,
     onBack: () -> Unit
 ) {
     BackHandler { onBack() }
@@ -174,9 +175,9 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Lucide.Info,
                         title = "历史会话",
-                        subtitle = "共 ${state.sessions.size} 条，在侧边栏可快速打开",
-                        actionLabel = null,
-                        onAction = {}
+                        subtitle = "共 ${state.sessions.size} 条",
+                        actionLabel = "打开",
+                        onAction = onOpenHistory
                     )
                 }
             }
@@ -233,7 +234,7 @@ private fun SettingsRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = TPAccentBlue)
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = brandAccentColor())
         Column(modifier = Modifier.weight(1f)) {
             Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Text(subtitle, fontSize = 10.sp, lineHeight = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

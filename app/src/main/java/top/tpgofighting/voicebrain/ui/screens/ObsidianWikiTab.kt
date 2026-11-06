@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Brain
+import com.composables.icons.lucide.Network
 import com.composables.icons.lucide.Lucide
 import top.tpgofighting.voicebrain.model.LmmWikiEntity
 import top.tpgofighting.voicebrain.model.ObsidianNote
@@ -28,7 +29,7 @@ import top.tpgofighting.voicebrain.ui.components.*
 import top.tpgofighting.voicebrain.ui.theme.*
 import top.tpgofighting.voicebrain.ui.viewmodel.MainUiState
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun ObsidianWikiTab(
     state: MainUiState,
@@ -62,8 +63,8 @@ fun ObsidianWikiTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Filled.AccountTree, contentDescription = null, tint = brandAccentColor(), modifier = Modifier.size(18.dp))
-                    Text("Obsidian Vault & LMMWiki", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                    Icon(Lucide.Network, contentDescription = null, tint = brandAccentColor(), modifier = Modifier.size(18.dp))
+                    Text("Obsidian Vault", fontSize = 13.sp, fontWeight = FontWeight.Black)
                 }
                 TPBadge(
                     text = when {
@@ -79,7 +80,11 @@ fun ObsidianWikiTab(
             // 默认只说人话；服务器绝对路径是部署细节，点按这一行才展开查看
             val pathVisible = showVaultPath && state.obsidianStatus.vaultPath.isNotBlank()
             Text(
-                text = if (pathVisible) state.obsidianStatus.vaultPath else "我的 Obsidian 仓库 · 与服务器实时同步",
+                text = if (pathVisible) state.obsidianStatus.vaultPath else when {
+                    !state.obsidianStatus.loaded -> "我的 Obsidian 仓库 · 状态确认中"
+                    state.obsidianStatus.connected -> "我的 Obsidian 仓库 · 与服务器实时同步"
+                    else -> "我的 Obsidian 仓库 · 未连接"
+                },
                 fontSize = if (pathVisible) 9.sp else 10.sp,
                 fontFamily = if (pathVisible) FontFamily.Monospace else FontFamily.Default,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -172,10 +177,19 @@ fun ObsidianWikiTab(
             ) {
                 // 分工说明：与记忆页的录音问答区分开，一句话讲清
                 Text(
-                    "这里查的是整个 Obsidian 仓库的笔记正文；录音里说过什么，去「记忆大脑」页问。",
+                    "查仓库笔记正文；录音内容去「记忆大脑」页问。",
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // 示例问题（与第二大脑页对齐的首轮脚手架，批次 R 补齐）
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AgentSuggestionChip("仓库里最近在更新什么主题") { onAskObsidian("仓库里最近在更新什么主题") }
+                    AgentSuggestionChip("LLM-Wiki 的核心概念是什么") { onAskObsidian("LLM-Wiki 的核心概念是什么") }
+                    AgentSuggestionChip("我的项目笔记里有哪些待办") { onAskObsidian("我的项目笔记里有哪些待办") }
+                }
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -237,7 +251,10 @@ fun ObsidianWikiTab(
                         modifier = Modifier.size(46.dp),
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(0.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = TPNavyDark, contentColor = TPMustardYellow)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (queryText.isBlank()) MaterialTheme.colorScheme.surfaceVariant else TPNavyDark,
+                            contentColor = if (queryText.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else TPMustardYellow
+                        )
                     ) {
                         Icon(Lucide.ArrowUp, contentDescription = "提问", modifier = Modifier.size(18.dp))
                     }

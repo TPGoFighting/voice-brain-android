@@ -209,16 +209,15 @@ fun MemoryBrainTab(
                         ) {
                             if (state.memories.isEmpty()) {
                                 // 简笔画线条动画：单色声波线按主题染色（与录音页空状态统一）
-                                LineLottie(
-                                    asset = "sound_wave.json",
-                                    modifier = Modifier.width(120.dp).height(34.dp),
-                                    tint = brandAccentColor()
+                                WaveGlyph(
+                                    modifier = Modifier.width(148.dp).height(40.dp),
+                                    color = brandAccentColor()
                                 )
                                 Text(
                                     "还没有沉淀任何记忆",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     "录一段音并生成纪要后，其中的决策、承诺和偏好会自动提炼到这里，越用越懂你。",
@@ -231,7 +230,7 @@ fun MemoryBrainTab(
                                     onClick = onGoRecord,
                                     interactionSource = goRecordInteraction,
                                     modifier = Modifier.pressScale(goRecordInteraction),
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(999.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark)
                                 ) {
                                     Text("去录一段", fontSize = 12.sp, fontWeight = FontWeight.Black)
@@ -336,7 +335,10 @@ fun MemoryBrainTab(
                         modifier = Modifier.size(46.dp),
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(0.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = TPNavyDark, contentColor = TPMustardYellow)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (inputQuery.isBlank()) MaterialTheme.colorScheme.surfaceVariant else TPNavyDark,
+                            contentColor = if (inputQuery.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else TPMustardYellow
+                        )
                     ) {
                         Icon(Lucide.ArrowUp, contentDescription = "发送", modifier = Modifier.size(18.dp))
                     }

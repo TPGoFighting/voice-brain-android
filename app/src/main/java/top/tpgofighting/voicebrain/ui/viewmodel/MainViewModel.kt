@@ -145,7 +145,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     BrainChatMessage(
                         id = "bc-0",
                         isUser = false,
-                        content = "你好！我是你的个人第二大脑助手。我已经接入你的长期记忆库与全部历史录音，问答会逐字引用原文出处，你可以随时问我过去讨论过的方案或决策。",
+                        content = "你好！我是你的个人第二大脑助手。你的长期记忆和历史录音都可以问我，问答会逐字引用原文出处；还没有录音的话先去录一段，决策、承诺和偏好会自动沉淀进来。",
                         timestamp = "刚刚"
                     )
                 ),
@@ -153,7 +153,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     BrainChatMessage(
                         id = "oc-0",
                         isUser = false,
-                        content = "欢迎来到 Obsidian 知识库问答。结合 Hermes Agent 引擎与本地 RAG，支持对全部笔记和录音材料进行多跳问答，并支持将思考结果反向追记回指定笔记。",
+                        content = "这里查的是你的 Obsidian 仓库笔记正文：概念、人物、项目都可以直接问，回答会标注来源笔记。录音里说过的内容不在这里查，去「记忆大脑」页问。开启下方的反向追记后，回答可以追加写回指定笔记。",
                         timestamp = "刚刚"
                     )
                 )

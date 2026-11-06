@@ -21,7 +21,7 @@ private val LightColorScheme = lightColorScheme(
     onBackground = TPTextPrimaryLight,
     surface = TPCardLight,
     onSurface = TPTextPrimaryLight,
-    surfaceVariant = TPAccentBlueLight,
+    surfaceVariant = TPNeutralFill,
     onSurfaceVariant = TPTextMutedLight,
     outline = TPBorderLight
 )
