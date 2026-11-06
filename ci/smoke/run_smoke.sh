@@ -27,16 +27,24 @@ dump() {
 dismiss_anr() { # emulator launchers occasionally ANR under swiftshader; the
   # system dialog then owns the UI hierarchy and every anchor fails even
   # though the app rendered fine underneath. Tap "Wait" to hand focus back.
-  local f="$OUT/anr-check.xml" coords
-  adb shell uiautomator dump /sdcard/anr.xml >/dev/null 2>&1
-  adb pull /sdcard/anr.xml "$f" >/dev/null 2>&1
-  if grep -q "isn.t responding" "$f" 2>/dev/null; then
-    if coords="$(python3 "$HERE/tap_text.py" "$f" "Wait")"; then
-      note "system ANR dialog present; tapping Wait ($coords)"
-      adb shell input tap $coords
-      sleep 2
+  # The dialog can reappear immediately, so try up to twice. Uses its own
+  # dump file and never recurses into dump().
+  local f="$OUT/anr-check.xml" coords attempt
+  for attempt in 1 2; do
+    adb shell uiautomator dump /sdcard/anr.xml >/dev/null 2>&1
+    adb pull /sdcard/anr.xml "$f" >/dev/null 2>&1
+    if grep -q "isn.t responding" "$f" 2>/dev/null; then
+      if coords="$(python3 "$HERE/tap_text.py" "$f" "Wait")"; then
+        note "system ANR dialog present; tapping Wait ($coords)"
+        adb shell input tap $coords
+        sleep 2
+      else
+        return 0
+      fi
+    else
+      return 0
     fi
-  fi
+  done
 }
 tap_tab() { # <tab label> <dump name the label is read from>
   local coords
@@ -108,7 +116,13 @@ else
   note "memories present (or fetch still pending); empty-state check not applicable"
 fi
 
-tap_tab "Obsidian" 04-memory; sleep 3
+# Agent chat surface (batch I redesign): open the second-brain subtab and
+# verify the suggestion chips render in the new agent component kit.
+tap_tab "问第二大脑" 04-memory; sleep 2
+shot 04b-agent; dump 04b-agent
+anchor 04b-agent.xml "回顾上周所有重大决策" "agent suggestions in second-brain subtab"
+
+tap_tab "Obsidian" 04b-agent; sleep 3
 shot 05-obsidian; dump 05-obsidian
 anchor 05-obsidian.xml "Obsidian Vault" "obsidian screen title"
 # Data-truth assertion: against the live server the status card must be

@@ -25,6 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.tpgofighting.voicebrain.model.BrainChatMessage
 import top.tpgofighting.voicebrain.model.MemoryItem
+import com.composables.icons.lucide.ArrowUp
+import com.composables.icons.lucide.Brain
+import com.composables.icons.lucide.Lucide
+import com.mikepenz.markdown.m3.Markdown
 import top.tpgofighting.voicebrain.ui.components.*
 import top.tpgofighting.voicebrain.ui.theme.*
 import top.tpgofighting.voicebrain.ui.viewmodel.MainUiState
@@ -204,6 +208,11 @@ fun MemoryBrainTab(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             if (state.memories.isEmpty()) {
+                                // 简笔画线条动画（LottieFiles 素材，Lottie 播放）：麦克风声波
+                                LineLottie(
+                                    asset = "ai_voice.json",
+                                    modifier = Modifier.size(76.dp)
+                                )
                                 Text(
                                     "还没有沉淀任何记忆",
                                     fontSize = 13.sp,
@@ -271,16 +280,7 @@ fun MemoryBrainTab(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     suggestions.forEach { prompt ->
-                        Box(
-                            modifier = Modifier
-                                .border(1.dp, TPAccentPurple.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                                .background(TPAccentPurpleLight, RoundedCornerShape(14.dp))
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable { onAskSecondBrain(prompt) }
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(prompt, fontSize = 10.sp, color = TPAccentPurple, fontWeight = FontWeight.Bold)
-                        }
+                        AgentSuggestionChip(text = prompt, onClick = { onAskSecondBrain(prompt) })
                     }
                 }
 
@@ -305,22 +305,8 @@ fun MemoryBrainTab(
                         ChatBubbleRow(msg, onSourceClick = { sessionId -> onOpenSession(sessionId) })
                     }
 
-                    if (state.isBrainThinking) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                                    .padding(8.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp, color = TPAccentPurple)
-                                    Text("第二大脑正在跨会话检索历史记忆与决策...", fontSize = 11.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
-                                }
-                            }
-                        }
-                    }
+                    // 思考态已并入 Agent 气泡本体（占位消息 isStreaming 时显示 Lottie 三点），
+                    // 不再有独立的转圈盒子
                 }
 
                 // 提问输入框
@@ -346,11 +332,12 @@ fun MemoryBrainTab(
                                 inputQuery = ""
                             }
                         },
-                        modifier = Modifier.height(46.dp),
-                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(46.dp),
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = TPNavyDark, contentColor = TPMustardYellow)
                     ) {
-                        Icon(Icons.Filled.Send, contentDescription = "发送", modifier = Modifier.size(16.dp))
+                        Icon(Lucide.ArrowUp, contentDescription = "发送", modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -500,109 +487,101 @@ fun MemoryCardItem(item: MemoryItem) {
 }
 
 @Composable
-fun ChatBubbleRow(msg: BrainChatMessage, onSourceClick: (String) -> Unit = {}) {
-    val isUser = msg.isUser
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
-    ) {
-        Box(
-            modifier = Modifier
-                .widthIn(max = 300.dp)
-                .border(
-                    1.dp,
-                    if (isUser) TPMustardYellowDark else MaterialTheme.colorScheme.outline,
-                    RoundedCornerShape(8.dp)
-                )
-                .background(
-                    if (isUser) TPMustardYellow else MaterialTheme.colorScheme.surface,
-                    RoundedCornerShape(8.dp)
-                )
-                .padding(10.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isUser) "你" else "第二大脑 Agent",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isUser) TPNavyDark else TPAccentPurple
-                    )
-                    Text(
-                        text = msg.timestamp,
-                        fontSize = 8.sp,
-                        color = if (isUser) TPNavyDark.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // 流式生成中显示闪烁光标
-                val cursorAlpha = if (msg.isStreaming) {
-                    val transition = rememberInfiniteTransition(label = "cursor")
-                    val alpha by transition.animateFloat(
-                        initialValue = 0.15f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(tween(450), RepeatMode.Reverse),
-                        label = "cursorAlpha"
-                    )
-                    alpha
-                } else 0f
-
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = msg.content.ifBlank { if (msg.isStreaming) "正在检索原文…" else "" },
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                        color = if (isUser) TPNavyDark else MaterialTheme.colorScheme.onSurface
-                    )
-                    if (msg.isStreaming) {
-                        Text(
-                            text = "▍",
-                            fontSize = 12.sp,
-                            color = TPAccentPurple.copy(alpha = cursorAlpha)
+fun ChatBubbleRow(
+    msg: BrainChatMessage,
+    agentName: String = "第二大脑 Agent",
+    onSourceClick: (String) -> Unit = {}
+) {
+    if (msg.isUser) {
+        // 用户消息：右对齐品牌黄气泡，无边框大圆角，入场淡入上浮
+        AgentAppear(appearKey = msg.id) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.End
+            ) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = 300.dp)
+                        .background(
+                            TPMustardYellow,
+                            RoundedCornerShape(topStart = 18.dp, topEnd = 6.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
                         )
-                    }
+                        .padding(horizontal = 13.dp, vertical = 9.dp)
+                ) {
+                    Text(msg.content, fontSize = 13.sp, lineHeight = 19.sp, color = TPNavyDark)
                 }
+                Text(
+                    msg.timestamp,
+                    fontSize = 8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp, end = 4.dp)
+                )
+            }
+        }
+        return
+    }
 
-                // 真实来源：服务端检索命中的原文片段（可点开对应会话）
-                if (msg.sources.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        msg.sources.take(4).forEach { src ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(TPAccentPurpleLight)
-                                    .clickable(enabled = src.sessionId.isNotBlank()) { onSourceClick(src.sessionId) }
-                                    .padding(horizontal = 8.dp, vertical = 5.dp)
-                            ) {
-                                Text(
-                                    text = "来源 · ${src.sessionTitle.ifBlank { "历史录音" }}",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = TPAccentPurple
-                                )
-                                Text(
-                                    text = "「${src.text.take(80)}」",
-                                    fontSize = 10.sp,
-                                    lineHeight = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
+    // Agent 消息：Lucide 大脑线条图标 + 名称行；正文为无边框柔面块。
+    // 思考中显示 Lottie 三点动画，流式中逐字浮现，完成后由 mikepenz Markdown 渲染。
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.padding(start = 2.dp)
+        ) {
+            Icon(Lucide.Brain, contentDescription = null, modifier = Modifier.size(14.dp), tint = TPAccentBlue)
+            Text(agentName, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TPAccentBlue)
+            Text(msg.timestamp, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        AgentAppear(appearKey = msg.id) {
+            Box(
+                modifier = Modifier
+                    .widthIn(max = 324.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        RoundedCornerShape(topStart = 6.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
+                    )
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Column {
+                    when {
+                        msg.isStreaming && msg.content.isBlank() ->
+                            AgentTypingIndicator(label = "正在检索原文与记忆")
+                        msg.isStreaming ->
+                            AgentStreamingText(fullText = msg.content, streaming = true, messageKey = msg.id)
+                        else ->
+                            Markdown(content = msg.content)
+                    }
+                    if (msg.sources.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(9.dp))
+                        Text(
+                            "来源",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            msg.sources.take(4).forEachIndexed { index, src ->
+                                AgentSourceRow(
+                                    title = src.sessionTitle,
+                                    quote = src.text,
+                                    appearKey = "${msg.id}-src-$index",
+                                    index = index,
+                                    onClick = { if (src.sessionId.isNotBlank()) onSourceClick(src.sessionId) }
                                 )
                             }
                         }
-                    }
-                } else if (msg.citations.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        msg.citations.forEach { cit ->
-                            TPBadge(text = "引用: $cit", variant = TPBadgeVariant.PURPLE)
+                    } else if (msg.citations.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            msg.citations.forEach { cit ->
+                                TPBadge(text = "引用: $cit", variant = TPBadgeVariant.BLUE)
+                            }
                         }
                     }
                 }

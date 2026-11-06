@@ -178,10 +178,11 @@ fun TPWaveformView(
                 label = "bar$i"
             )
             Box(
+                // 简笔画线条感：柱子收细到 2dp，间距拉开（批次 I）
                 modifier = Modifier
-                    .width(3.5.dp)
+                    .width(2.dp)
                     .fillMaxHeight(animated)
-                    .clip(RoundedCornerShape(2.dp))
+                    .clip(RoundedCornerShape(1.dp))
                     .background(if (isRecording) barColor else Color.LightGray)
             )
         }

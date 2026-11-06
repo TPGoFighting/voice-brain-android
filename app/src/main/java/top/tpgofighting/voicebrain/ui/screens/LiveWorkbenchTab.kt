@@ -631,11 +631,10 @@ fun LiveWorkbenchTab(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.RecordVoiceOver,
-                            contentDescription = null,
-                            tint = Color.LightGray,
-                            modifier = Modifier.size(36.dp)
+                        // 简笔画线条动画（LottieFiles 素材）：声波麦克风，替代静态图标
+                        LineLottie(
+                            asset = "ai_voice.json",
+                            modifier = Modifier.size(64.dp)
                         )
                         Text(
                             text = "静候声音输入...",

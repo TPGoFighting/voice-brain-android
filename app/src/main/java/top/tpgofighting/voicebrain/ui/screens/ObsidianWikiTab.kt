@@ -19,6 +19,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.composables.icons.lucide.ArrowUp
+import com.composables.icons.lucide.Brain
+import com.composables.icons.lucide.Lucide
 import top.tpgofighting.voicebrain.model.LmmWikiEntity
 import top.tpgofighting.voicebrain.model.ObsidianNote
 import top.tpgofighting.voicebrain.ui.components.*
@@ -179,21 +182,31 @@ fun ObsidianWikiTab(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(state.obsidianChatHistory, key = { it.id }) { msg ->
-                        ChatBubbleRow(msg)
+                        ChatBubbleRow(msg, agentName = "Hermes Agent")
                     }
 
                     if (state.isObsidianThinking) {
+                        // 与记忆页统一的思考态：Agent 名称行 + 柔面气泡里的 Lottie 三点
                         item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                                    .padding(8.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp, color = TPAccentPurple)
-                                    Text("Hermes Agent 正在检索 Obsidian Vault 多跳双链...", fontSize = 11.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                    modifier = Modifier.padding(start = 2.dp)
+                                ) {
+                                    Icon(Lucide.Brain, contentDescription = null, modifier = Modifier.size(14.dp), tint = TPAccentBlue)
+                                    Text("Hermes Agent", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TPAccentBlue)
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                            RoundedCornerShape(topStart = 6.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                                ) {
+                                    AgentTypingIndicator(label = "正在检索仓库笔记与双链")
                                 }
                             }
                         }
@@ -222,11 +235,12 @@ fun ObsidianWikiTab(
                                 queryText = ""
                             }
                         },
-                        modifier = Modifier.height(46.dp),
-                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(46.dp),
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = TPNavyDark, contentColor = TPMustardYellow)
                     ) {
-                        Icon(Icons.Filled.Send, contentDescription = "提问", modifier = Modifier.size(16.dp))
+                        Icon(Lucide.ArrowUp, contentDescription = "提问", modifier = Modifier.size(18.dp))
                     }
                 }
             }

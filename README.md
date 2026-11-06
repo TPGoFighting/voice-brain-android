@@ -63,6 +63,19 @@
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
+## v1.2.0 (2026-11-06) 批次 I · 第三方库驱动的简约线条风大改
+
+按 TP 指示：功能不变，布局与组件尽量用现成开源库与素材，不参考 Web 版。
+
+引入的第三方件（全部按 Kotlin 2.0.21 / Compose 1.7 兼容线选版，避免连锁升栈）：
+- **Lucide 图标库**（com.composables:icons-lucide 1.1.0，ISC）：底部导航（Mic/NotebookText/Brain/Network）、Agent 名称（Brain）、来源（Link2）、发送（ArrowUp 圆形钮）统一为简笔画线条图标。
+- **Airbnb Lottie**（lottie-compose 6.6.10，Apache-2.0）+ **LottieFiles 免费简笔画素材**（Lottie Simple License，存 assets/lottie/）：AI 声波麦克风（录音待机 + 记忆空状态）、Typing Loader 三点（Agent 思考态，单色素材经 COLOR_FILTER 按主题着色）、Sound Wave（备用素材）。
+- **mikepenz Markdown 渲染器**（multiplatform-markdown-renderer-m3 0.27.0，Apache-2.0）：Agent 回答正文与纪要成稿改由该库渲染，替代手写简版解析。
+
+Agent 界面重做：用户气泡品牌黄大圆角无边框；Agent 气泡柔面无边框 + 线条图标名称行；思考态并入气泡本体（Lottie 三点 + 状态文案），流式逐字平滑浮现（积压加速追赶），来源改为级联入场的紧凑行，建议提问改为柔边框胶囊（带按压缩放）。Obsidian 页 Hermes 问答同步换装。波形柱收细到 2dp 呈线条感。
+
+未采用：GetStream 的 stream-chat-android-ai 成品包（专为 AI Agent 的 Compose 组件库）——其构建基线为 Compose 1.9 + Kotlin 2.2，硬装会连锁升级整个技术栈；如需官方原包，另开全栈升级批次处理。
+
 ## v1.1.9 (2026-11-06) 动效批次 G
 
 选型结论（先审计后引库）：切页已有 AnimatedContent+弹簧、录音按钮已有按压弹簧，真正缺的是模糊层与列表动效。引库只引一个，其余用框架内置补齐：

@@ -13,8 +13,8 @@ android {
         applicationId = "top.tpgofighting.voicebrain"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.1.9"
+        versionCode = 15
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -98,6 +98,14 @@ dependencies {
     // 高斯模糊（底部导航栏毛玻璃）：Haze 1.3.1 与当前 Compose BOM 2024.12（Compose 1.7）同期配套；
     // Haze 2.x 面向 Compose 1.12，不跟随升级以免连锁升 BOM。
     implementation("dev.chrisbanes.haze:haze:1.3.1")
+    // 批次 I 第三方库（均按 Kotlin 2.0.21 / Compose 1.7 兼容线选版）：
+    // Lottie（Airbnb 官方 Compose 绑定）播放简笔画线条动画素材
+    implementation("com.airbnb.android:lottie-compose:6.6.10")
+    // Lucide 线性图标库（composables.com 出品）：全 App 图标统一为简笔画线条风
+    implementation("com.composables:icons-lucide:1.1.0")
+    // mikepenz Markdown 渲染器（Material 3 版）：Agent 回答与纪要成稿的富文本渲染；
+    // 0.27.0 恰构建于 Kotlin 2.0.21，与本项目编译器同线
+    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.27.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 

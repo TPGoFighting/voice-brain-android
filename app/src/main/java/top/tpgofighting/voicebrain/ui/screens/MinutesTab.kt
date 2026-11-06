@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.tpgofighting.voicebrain.model.ActionItem
 import top.tpgofighting.voicebrain.model.Persona
+import com.mikepenz.markdown.m3.Markdown
 import top.tpgofighting.voicebrain.ui.components.*
 import top.tpgofighting.voicebrain.ui.theme.*
 import top.tpgofighting.voicebrain.ui.viewmodel.MainUiState
@@ -274,7 +275,8 @@ fun MinutesTab(
                         contentPadding = PaddingValues(bottom = 96.dp)
                     ) {
                         item {
-                            TPMarkdownView(markdown = state.polishedDraft)
+                            // 成稿用 mikepenz Markdown 渲染器（Material 3 主题桥接）
+                            Markdown(content = state.polishedDraft)
                         }
                     }
                 }

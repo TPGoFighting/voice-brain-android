@@ -8,6 +8,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import com.composables.icons.lucide.Brain
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Mic
+import com.composables.icons.lucide.Network
+import com.composables.icons.lucide.NotebookText
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,12 +36,12 @@ import top.tpgofighting.voicebrain.ui.theme.TPMustardYellow
 import top.tpgofighting.voicebrain.ui.theme.TPNavyDark
 import top.tpgofighting.voicebrain.ui.viewmodel.MainViewModel
 
-// 主导航图标统一用线性（Outlined）风格，与 TP 的线绘设计语言一致，不用实心图标
+// 主导航图标统一用 Lucide 线性图标（简笔画线条风），不用实心图标
 enum class NavigationTab(val label: String, val icon: ImageVector) {
-    LIVE("实时录音", Icons.Outlined.Mic),
-    MINUTES("纪要决策", Icons.Outlined.Article),
-    MEMORY("记忆大脑", Icons.Outlined.Psychology),
-    OBSIDIAN("Obsidian", Icons.Outlined.Hub)
+    LIVE("实时录音", Lucide.Mic),
+    MINUTES("纪要决策", Lucide.NotebookText),
+    MEMORY("记忆大脑", Lucide.Brain),
+    OBSIDIAN("Obsidian", Lucide.Network)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
