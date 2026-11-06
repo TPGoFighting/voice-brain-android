@@ -490,23 +490,7 @@ class VoiceBrainApiClient(
                 return@withContext Result.failure(IllegalStateException("obsidian/status HTTP ${response.code}"))
             }
 
-            val obj = json.parseToJsonElement(respBody).jsonObject
-            val data = obj["data"]?.jsonObject ?: obj
-            // 服务端真实字段（2026-11-06 对照 ATP 实测响应）：
-            // vaultExists / voiceNotesCount / agentStatus{status, notes}
-            val agent = data["agentStatus"]?.jsonObject
-            val vaultExists = data["vaultExists"]?.jsonPrimitive?.booleanOrNull ?: false
-            val agentOk = agent?.get("status")?.jsonPrimitive?.contentOrNull == "ok"
-            Result.success(
-                ObsidianStatus(
-                    loaded = true,
-                    connected = vaultExists && agentOk,
-                    vaultPath = data["vaultPath"]?.jsonPrimitive?.content ?: "",
-                    totalNotes = agent?.get("notes")?.jsonPrimitive?.intOrNull ?: 0,
-                    syncedVoiceNotes = data["voiceNotesCount"]?.jsonPrimitive?.intOrNull ?: 0,
-                    hermesAvailable = agentOk
-                )
-            )
+            Result.success(parseObsidianStatusBody(respBody))
         } catch (e: Exception) {
             Log.e(TAG, "fetchObsidianStatus failed: ${e.message}", e)
             Result.failure(e)
@@ -548,4 +532,28 @@ class VoiceBrainApiClient(
             Result.failure(e)
         }
     }
+}
+
+private val obsidianStatusJson = Json { ignoreUnknownKeys = true }
+
+/**
+ * 解析 /api/obsidian/status 的响应体。只认服务端真实字段
+ * （2026-11-06 对照 ATP 实测）：vaultExists / voiceNotesCount /
+ * agentStatus{status, notes}。字段缺失时给出诚实的 0 / false，
+ * 绝不回退到任何编造的默认值。抽成独立函数供单元测试锁定映射。
+ */
+internal fun parseObsidianStatusBody(body: String): ObsidianStatus {
+    val obj = obsidianStatusJson.parseToJsonElement(body).jsonObject
+    val data = obj["data"]?.jsonObject ?: obj
+    val agent = data["agentStatus"]?.jsonObject
+    val vaultExists = data["vaultExists"]?.jsonPrimitive?.booleanOrNull ?: false
+    val agentOk = agent?.get("status")?.jsonPrimitive?.contentOrNull == "ok"
+    return ObsidianStatus(
+        loaded = true,
+        connected = vaultExists && agentOk,
+        vaultPath = data["vaultPath"]?.jsonPrimitive?.content ?: "",
+        totalNotes = agent?.get("notes")?.jsonPrimitive?.intOrNull ?: 0,
+        syncedVoiceNotes = data["voiceNotesCount"]?.jsonPrimitive?.intOrNull ?: 0,
+        hermesAvailable = agentOk
+    )
 }
