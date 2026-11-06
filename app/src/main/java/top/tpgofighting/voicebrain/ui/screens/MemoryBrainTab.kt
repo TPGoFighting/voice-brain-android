@@ -33,7 +33,7 @@ import top.tpgofighting.voicebrain.ui.components.*
 import top.tpgofighting.voicebrain.ui.theme.*
 import top.tpgofighting.voicebrain.ui.viewmodel.MainUiState
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun MemoryBrainTab(
     state: MainUiState,
@@ -273,11 +273,11 @@ fun MemoryBrainTab(
                     "回顾上周所有重大决策"
                 )
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                // 建议胶囊自动换行全部露出：横滑会把第三个切在屏幕外（TP 指出像截断）
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     suggestions.forEach { prompt ->
                         AgentSuggestionChip(text = prompt, onClick = { onAskSecondBrain(prompt) })
@@ -312,7 +312,7 @@ fun MemoryBrainTab(
                 // 提问输入框
                 Row(
                     // 输入行是固定底栏：内容通铺后要自带底部间距，停在毛玻璃导航栏上方
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 88.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 100.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -551,7 +551,7 @@ fun ChatBubbleRow(
                         msg.isStreaming ->
                             AgentStreamingText(fullText = msg.content, streaming = true, messageKey = msg.id)
                         else ->
-                            Markdown(content = msg.content)
+                            Markdown(content = msg.content, typography = TPMarkdownTypography())
                     }
                     if (msg.sources.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(9.dp))

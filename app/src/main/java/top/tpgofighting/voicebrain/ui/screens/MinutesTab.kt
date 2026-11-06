@@ -275,8 +275,8 @@ fun MinutesTab(
                         contentPadding = PaddingValues(bottom = 96.dp)
                     ) {
                         item {
-                            // 成稿用 mikepenz Markdown 渲染器（Material 3 主题桥接）
-                            Markdown(content = state.polishedDraft)
+                            // 成稿用 mikepenz Markdown 渲染器 + 聊天尺度字阶
+                            Markdown(content = state.polishedDraft, typography = TPMarkdownTypography())
                         }
                     }
                 }

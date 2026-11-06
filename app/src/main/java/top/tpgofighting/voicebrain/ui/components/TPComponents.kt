@@ -2,6 +2,13 @@ package top.tpgofighting.voicebrain.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.MarkdownTypography
+import top.tpgofighting.voicebrain.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -299,4 +306,59 @@ fun Modifier.pressScale(
         label = "pressScale"
     )
     return this.then(Modifier.scale(scale))
+}
+
+/**
+ * TP 线稿 Logo 磁贴：TP 给定的正式线条 Logo（等距 TP 字标，黑线白底），
+ * 装进白色圆角磁贴里使用——浅色/深色主题下都成立，替代此前手写的黄底「TP」字块。
+ */
+@Composable
+fun TPLogoTile(size: Dp = 34.dp, modifier: Modifier = Modifier) {
+    val radius = size * 0.26f
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(radius))
+            .background(Color.White)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f), RoundedCornerShape(radius)),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(R.drawable.tp_logo),
+            contentDescription = "TP Logo",
+            modifier = Modifier.size(size * 0.86f),
+            contentScale = ContentScale.Fit
+        )
+    }
+}
+
+/**
+ * 聊天尺度的 Markdown 字阶：mikepenz 默认拿 displayLarge/bodyLarge 渲染，
+ * 在气泡里过大；这里统一到正文 14sp、标题 15–17sp 的对话尺度。
+ */
+@Composable
+fun TPMarkdownTypography(): MarkdownTypography {
+    val body = TextStyle(fontSize = 14.sp, lineHeight = 21.sp)
+    return markdownTypography(
+        h1 = TextStyle(fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold),
+        h2 = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold),
+        h3 = TextStyle(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold),
+        h4 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold),
+        h5 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold),
+        h6 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold),
+        text = body,
+        paragraph = body,
+        ordered = body,
+        bullet = body,
+        list = body,
+        quote = TextStyle(fontSize = 13.sp, lineHeight = 20.sp),
+        code = TextStyle(fontSize = 12.5.sp, lineHeight = 18.sp, fontFamily = FontFamily.Monospace),
+        link = TextStyle(
+            fontSize = 14.sp,
+            lineHeight = 21.sp,
+            fontWeight = FontWeight.Bold,
+            color = TPAccentBlue,
+            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+        )
+    )
 }

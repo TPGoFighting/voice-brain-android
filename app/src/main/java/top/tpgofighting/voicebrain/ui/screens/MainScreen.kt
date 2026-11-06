@@ -39,7 +39,9 @@ import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.haze
 import dev.chrisbanes.haze.hazeEffect
 import top.tpgofighting.voicebrain.ui.components.TPBadge
-import top.tpgofighting.voicebrain.ui.components.TPBadgeVariant
+import top.tpgofighting.voicebrain.ui.components.TPLogoTile
+import top.tpgofighting.voicebrain.ui.components.TPBadge
+import top.tpgofighting.voicebrain.ui.components.TPLogoTileVariant
 import top.tpgofighting.voicebrain.ui.theme.TPMustardYellow
 import top.tpgofighting.voicebrain.ui.theme.TPNavyDark
 import top.tpgofighting.voicebrain.ui.viewmodel.MainViewModel
@@ -128,14 +130,7 @@ fun MainScreen(
                 },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .border(1.5.dp, TPNavyDark, RoundedCornerShape(6.dp))
-                                .background(TPMustardYellow, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("TP", fontSize = 12.sp, fontWeight = FontWeight.Black, color = TPNavyDark)
-                        }
+                        TPLogoTile(size = 30.dp)
                         Text("Voice Brain", fontSize = 15.sp, fontWeight = FontWeight.Black)
                         TPBadge(text = uiState.currentPersona.badge, variant = TPBadgeVariant.YELLOW)
                     }
@@ -303,8 +298,10 @@ fun MainScreen(
 }
 
 /**
- * 侧边抽屉（批次 J）：主流软件式布局——品牌头 + 主导航 + 历史会话 + 设置入口。
- * 底部导航保留拇指区快捷切换，抽屉承载历史与设置这类低频但重要的入口。
+ * 侧边抽屉（批次 J/K）：主流软件式布局——品牌头 + 主导航 + 历史会话 + 设置入口。
+ * 批次 K 按 TP 的间距规范重排：一套统一标尺——两侧留白 20dp 对称、行高至少 52dp
+ * （点击区足够大）、图标 16dp 略小于文字、图文间距 12dp 全栏一致、圆角 10dp 与
+ * TPCard 同级一致、组内行距 2dp 而组间 24dp（组间比组内松）。
  */
 @Composable
 private fun AppDrawerSheet(
@@ -324,133 +321,141 @@ private fun AppDrawerSheet(
             modifier = Modifier
                 .fillMaxHeight()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(horizontal = 20.dp, vertical = 24.dp)
         ) {
-            // 品牌头
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(
-                    modifier = Modifier
-                        .border(1.5.dp, TPNavyDark, RoundedCornerShape(8.dp))
-                        .background(TPMustardYellow, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text("TP", fontSize = 13.sp, fontWeight = FontWeight.Black, color = TPNavyDark)
-                }
-                Column {
+            // 品牌头：TP 正式线稿 Logo + 名称
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(horizontal = 12.dp)
+            ) {
+                TPLogoTile(size = 40.dp)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("Voice Brain", fontSize = 15.sp, fontWeight = FontWeight.Black)
                     Text("AI 录音豆", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // 主导航
-            NavigationTab.values().forEach { tab ->
-                val selected = tab == currentTab
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            if (selected) TPMustardYellow else Color.Transparent,
-                            RoundedCornerShape(12.dp)
+            // 主导航：每行 52dp 高，图标 16dp、图文距 12dp、选中胶囊圆角 10dp（与卡片同级）
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                NavigationTab.values().forEach { tab ->
+                    val selected = tab == currentTab
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp)
+                            .background(
+                                if (selected) TPMustardYellow else Color.Transparent,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { onSelectTab(tab) }
+                            .padding(horizontal = 12.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            tab.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        .clickable { onSelectTab(tab) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        tab.icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        tab.label,
-                        fontSize = 13.sp,
-                        fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
-                        color = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurface
-                    )
+                        Text(
+                            tab.label,
+                            fontSize = 14.sp,
+                            fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+                            color = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(24.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(24.dp))
 
             // 历史会话
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Lucide.History, contentDescription = null, modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("历史会话", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    Icon(Lucide.History, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("历史会话", fontSize = 14.sp, fontWeight = FontWeight.Black)
                 }
-                IconButton(onClick = onRefreshSessions, modifier = Modifier.size(28.dp)) {
-                    Icon(Lucide.RefreshCw, contentDescription = "刷新会话", modifier = Modifier.size(14.dp))
+                IconButton(onClick = onRefreshSessions, modifier = Modifier.size(32.dp)) {
+                    Icon(Lucide.RefreshCw, contentDescription = "刷新会话", modifier = Modifier.size(15.dp))
                 }
             }
+            Spacer(Modifier.height(8.dp))
             if (state.sessions.isEmpty()) {
                 Text(
                     "暂无历史会话，录一段就会出现在这里",
                     fontSize = 11.sp,
+                    lineHeight = 16.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                 )
             } else {
-                state.sessions.take(8).forEach { session ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenSession(session.id) }
-                            .padding(horizontal = 4.dp, vertical = 7.dp)
-                    ) {
-                        Text(
-                            session.title.ifBlank { "未命名会话" },
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        val metaParts = mutableListOf<String>()
-                        if (session.stamp.isNotBlank()) metaParts += session.stamp
-                        if (session.durationLabel.isNotBlank()) metaParts += session.durationLabel
-                        if (session.utteranceCount > 0) metaParts += "${session.utteranceCount} 句"
-                        val meta = metaParts.joinToString(" · ")
-                        if (meta.isNotBlank()) {
-                            Text(meta, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    state.sessions.take(8).forEach { session ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .clickable { onOpenSession(session.id) }
+                                .padding(horizontal = 12.dp, vertical = 9.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                session.title.ifBlank { "未命名会话" },
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            val metaParts = mutableListOf<String>()
+                            if (session.stamp.isNotBlank()) metaParts += session.stamp
+                            if (session.durationLabel.isNotBlank()) metaParts += session.durationLabel
+                            if (session.utteranceCount > 0) metaParts += "${session.utteranceCount} 句"
+                            val meta = metaParts.joinToString(" · ")
+                            if (meta.isNotBlank()) {
+                                Text(meta, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(24.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // 设置入口
+            // 设置入口：与导航行同一标尺
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 52.dp)
                     .clickable { onOpenSettings() }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(horizontal = 12.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Lucide.Settings2, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("设置", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Icon(Lucide.Settings2, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("设置", fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
             Text(
                 "voice.tpgofighting.top",
                 fontSize = 9.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 12.dp)
+                modifier = Modifier.padding(horizontal = 12.dp)
             )
         }
     }

@@ -215,7 +215,7 @@ fun ObsidianWikiTab(
 
                 // 提问输入框（固定底栏：内容通铺后自带底部间距，停在毛玻璃导航栏上方）
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 88.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 100.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
