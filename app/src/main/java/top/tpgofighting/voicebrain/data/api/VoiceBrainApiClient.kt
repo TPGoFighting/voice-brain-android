@@ -486,23 +486,30 @@ class VoiceBrainApiClient(
             val response = client.newCall(request).execute()
             val respBody = response.body?.string() ?: ""
             if (!response.isSuccessful) {
-                return@withContext Result.success(ObsidianStatus()) // 回退默认
+                // 失败必须如实上报，绝不回退成编造的默认状态
+                return@withContext Result.failure(IllegalStateException("obsidian/status HTTP ${response.code}"))
             }
 
             val obj = json.parseToJsonElement(respBody).jsonObject
             val data = obj["data"]?.jsonObject ?: obj
+            // 服务端真实字段（2026-11-06 对照 ATP 实测响应）：
+            // vaultExists / voiceNotesCount / agentStatus{status, notes}
+            val agent = data["agentStatus"]?.jsonObject
+            val vaultExists = data["vaultExists"]?.jsonPrimitive?.booleanOrNull ?: false
+            val agentOk = agent?.get("status")?.jsonPrimitive?.contentOrNull == "ok"
             Result.success(
                 ObsidianStatus(
-                    connected = data["connected"]?.jsonPrimitive?.booleanOrNull ?: true,
-                    vaultPath = data["vaultPath"]?.jsonPrimitive?.content ?: "/home/ubuntu/obsidian-vault",
-                    totalNotes = data["totalNotes"]?.jsonPrimitive?.intOrNull ?: 23,
-                    syncedVoiceNotes = data["syncedVoiceNotes"]?.jsonPrimitive?.intOrNull ?: 8,
-                    hermesAvailable = data["hermesAvailable"]?.jsonPrimitive?.booleanOrNull ?: true
+                    loaded = true,
+                    connected = vaultExists && agentOk,
+                    vaultPath = data["vaultPath"]?.jsonPrimitive?.content ?: "",
+                    totalNotes = agent?.get("notes")?.jsonPrimitive?.intOrNull ?: 0,
+                    syncedVoiceNotes = data["voiceNotesCount"]?.jsonPrimitive?.intOrNull ?: 0,
+                    hermesAvailable = agentOk
                 )
             )
         } catch (e: Exception) {
             Log.e(TAG, "fetchObsidianStatus failed: ${e.message}", e)
-            Result.success(ObsidianStatus())
+            Result.failure(e)
         }
     }
 

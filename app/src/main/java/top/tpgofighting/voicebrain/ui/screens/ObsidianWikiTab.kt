@@ -2,6 +2,7 @@ package top.tpgofighting.voicebrain.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,7 +28,8 @@ import top.tpgofighting.voicebrain.ui.viewmodel.MainUiState
 fun ObsidianWikiTab(
     state: MainUiState,
     onToggleAutoWriteBack: () -> Unit,
-    onAskObsidian: (String) -> Unit
+    onAskObsidian: (String) -> Unit,
+    onRefreshObsidianStatus: () -> Unit
 ) {
     var queryText by remember { mutableStateOf("") }
     var selectedSection by remember { mutableStateOf(0) } // 0: Hermes问答对账, 1: 笔记与实体网络
@@ -53,8 +55,12 @@ fun ObsidianWikiTab(
                     Text("Obsidian Vault & LMMWiki", fontSize = 13.sp, fontWeight = FontWeight.Black)
                 }
                 TPBadge(
-                    text = if (state.obsidianStatus.connected) "Vault 已挂载" else "未连接",
-                    variant = if (state.obsidianStatus.connected) TPBadgeVariant.GREEN else TPBadgeVariant.DARK
+                    text = when {
+                        !state.obsidianStatus.loaded -> "状态未知"
+                        state.obsidianStatus.connected -> "Vault 已挂载"
+                        else -> "未连接"
+                    },
+                    variant = if (state.obsidianStatus.loaded && state.obsidianStatus.connected) TPBadgeVariant.GREEN else TPBadgeVariant.DARK
                 )
             }
 
@@ -72,10 +78,23 @@ fun ObsidianWikiTab(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("笔记总数: ${state.obsidianStatus.totalNotes}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("·", fontSize = 10.sp)
-                    Text("录音归档: ${state.obsidianStatus.syncedVoiceNotes}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TPAccentBlue)
+                if (state.obsidianStatus.loaded) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("笔记总数: ${state.obsidianStatus.totalNotes}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("·", fontSize = 10.sp)
+                        Text("录音归档: ${state.obsidianStatus.syncedVoiceNotes}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TPAccentBlue)
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("状态未知", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "重试",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TPAccentBlue,
+                            modifier = Modifier.clickable { onRefreshObsidianStatus() }
+                        )
+                    }
                 }
 
                 // Hermes 反向追记开关

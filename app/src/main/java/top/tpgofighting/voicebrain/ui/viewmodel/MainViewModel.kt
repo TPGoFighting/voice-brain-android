@@ -150,10 +150,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val obsRes = apiClient.fetchObsidianStatus()
             if (obsRes.isSuccess) {
-                _uiState.update { it.copy(obsidianStatus = obsRes.getOrNull()!!) }
+                _uiState.update { it.copy(obsidianStatus = obsRes.getOrNull() ?: ObsidianStatus()) }
             }
 
             refreshSessions()
+        }
+    }
+
+    /** 重新拉取 Obsidian 状态；失败时保持 loaded=false，界面显示状态未知。 */
+    fun refreshObsidianStatus() {
+        viewModelScope.launch {
+            val res = apiClient.fetchObsidianStatus()
+            _uiState.update { it.copy(obsidianStatus = res.getOrNull() ?: ObsidianStatus()) }
         }
     }
 

@@ -63,6 +63,10 @@
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
+## v1.1.1 (2026-11-06) 产品审查修复 · 第 1 项
+
+- **Obsidian 状态卡数据真伪**：状态接口改按服务端真实字段解析——笔记总数取 `agentStatus.notes`、录音归档取 `voiceNotesCount`、是否挂载取 `vaultExists` + Agent 状态。此前客户端读的是服务端不存在的字段名，读不到便用写死的默认值（23 / 8 / 已挂载）冒充真实数据；现请求失败或字段缺失时如实显示「状态未知」并可点按重试，不再编造数字。
+
 ## v1.1.0 (2026-11-06) 全量升级
 
 与 Web 端三期升级对齐，并针对 Android 设备体验做系统性优化：

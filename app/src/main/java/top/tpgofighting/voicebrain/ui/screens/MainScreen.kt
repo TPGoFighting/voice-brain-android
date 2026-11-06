@@ -192,7 +192,8 @@ fun MainScreen(viewModel: MainViewModel) {
                     ObsidianWikiTab(
                         state = uiState,
                         onToggleAutoWriteBack = { viewModel.toggleAutoWriteBack() },
-                        onAskObsidian = { viewModel.askObsidian(it) }
+                        onAskObsidian = { viewModel.askObsidian(it) },
+                        onRefreshObsidianStatus = { viewModel.refreshObsidianStatus() }
                     )
                 }
             }

@@ -163,11 +163,14 @@ data class MemoryItem(
 )
 
 data class ObsidianStatus(
-    val connected: Boolean = true,
-    val vaultPath: String = "/home/ubuntu/obsidian-vault",
-    val totalNotes: Int = 23,
-    val syncedVoiceNotes: Int = 8,
-    val hermesAvailable: Boolean = true
+    // loaded=false 表示尚未从服务端拿到真实状态，界面必须显示未知，
+    // 严禁用默认值伪装成真实数据。
+    val loaded: Boolean = false,
+    val connected: Boolean = false,
+    val vaultPath: String = "",
+    val totalNotes: Int = 0,
+    val syncedVoiceNotes: Int = 0,
+    val hermesAvailable: Boolean = false
 )
 
 data class ObsidianNote(
