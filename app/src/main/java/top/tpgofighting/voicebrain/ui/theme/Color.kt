@@ -23,6 +23,11 @@ val TPAccentGreenLight = Color(0xFFECFDF5)
 val TPAccentYellowLight = Color(0xFFFEFCE8)
 val TPAccentRed = Color(0xFFEF4444)
 
+// 警告语义色：与品牌黄分工——黄色只用于主操作与选中态，警告一律用这套橙色
+val TPWarning = Color(0xFFD97706)
+val TPWarningDark = Color(0xFF92400E)
+val TPWarningLight = Color(0xFFFFF7ED)
+
 val TPTextPrimaryLight = Color(0xFF0F172A)
 val TPTextPrimaryDark = Color(0xFFF8FAFC)
 val TPTextMutedLight = Color(0xFF64748B)

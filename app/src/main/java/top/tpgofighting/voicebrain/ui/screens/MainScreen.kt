@@ -161,7 +161,8 @@ fun MainScreen(viewModel: MainViewModel) {
                         onBatteryExemption = { viewModel.requestBatteryExemption() },
                         onAutoStartSettings = { viewModel.openAutoStartSettings() },
                         onConfirmMicPermission = { viewModel.confirmMicPermissionRequest() },
-                        onDismissMicRationale = { viewModel.dismissMicRationale() }
+                        onDismissMicRationale = { viewModel.dismissMicRationale() },
+                        onBatteryHintHandled = { viewModel.onBatteryHintHandled() }
                     )
                 }
                 NavigationTab.MINUTES -> {

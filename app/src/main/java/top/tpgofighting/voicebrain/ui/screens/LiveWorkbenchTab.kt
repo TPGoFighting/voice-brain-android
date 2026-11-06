@@ -64,11 +64,13 @@ fun LiveWorkbenchTab(
     onBatteryExemption: () -> Unit = {},
     onAutoStartSettings: () -> Unit = {},
     onConfirmMicPermission: () -> Unit = {},
-    onDismissMicRationale: () -> Unit = {}
+    onDismissMicRationale: () -> Unit = {},
+    onBatteryHintHandled: () -> Unit = {}
 ) {
     val listState = rememberLazyListState()
     var showDeviceMenu by remember { mutableStateOf(false) }
     var showArchive by remember { mutableStateOf(false) }
+    var advancedExpanded by remember { mutableStateOf(false) }
 
     // 自动滚动至最新的转写句子
     LaunchedEffect(state.utterances.size) {
@@ -133,8 +135,11 @@ fun LiveWorkbenchTab(
                         state.isRecording -> TPBadgeVariant.YELLOW
                         else -> TPBadgeVariant.DARK
                     }
-                    TPBadge(text = state.wsStatusText, variant = statusVariant)
-                    TPBadge(text = "16kHz PCM", variant = TPBadgeVariant.OUTLINE)
+                    // 未开始录音时连接状态没有意义，只显示准备就绪
+                    TPBadge(
+                        text = if (state.isRecording || state.wsStatusConnected) state.wsStatusText else "准备就绪",
+                        variant = statusVariant
+                    )
                 }
 
                 val mins = String.format("%02d", state.recordDurationSeconds / 60)
@@ -173,7 +178,7 @@ fun LiveWorkbenchTab(
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = if (state.isRecording) "停止录音并沉淀 (Stop)" else "开始实时录音 (Start Recording)",
+                        text = if (state.isRecording) "停止并保存" else "开始录音",
                         fontWeight = FontWeight.Black,
                         fontSize = 14.sp
                     )
@@ -287,6 +292,24 @@ fun LiveWorkbenchTab(
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            // 录音设置默认收起：录音前首屏只留开始按钮与音源；录音中/已有
+            // 录音数据时自动展开，也可手动展开（断句、数据量、导出都在里面）
+            val showAdvanced = advancedExpanded || state.isRecording || state.totalFrames > 0 || state.utterances.isNotEmpty()
+            if (!showAdvanced) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { advancedExpanded = true }
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(Icons.Filled.Tune, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("录音设置（断句、导出）", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Filled.ExpandMore, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (showAdvanced) {
             // 断句停顿判定 (500ms 紧凑 / 800ms 标准 / 1200ms 从容)
             Row(
                 modifier = Modifier
@@ -340,9 +363,11 @@ fun LiveWorkbenchTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${state.totalFrames} 帧 (${(state.totalBytes / 1024f).let { String.format("%.1f", it) }} KB)",
+                    text = if (state.totalBytes > 0) {
+                        val kb = state.totalBytes / 1024f
+                        if (kb < 1024f) "已录 %.1f KB".format(kb) else "已录 %.1f MB".format(kb / 1024f)
+                    } else "尚未录音",
                     fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
@@ -370,15 +395,17 @@ fun LiveWorkbenchTab(
                 }
             }
 
-            // 后台保活提示（未豁免电池优化时）
-            if (!state.batteryExempt) {
+            }
+            // 后台保活提示：只在首次录音后出现一次，处理过不再打扰；
+            // 配色用警告橙，与品牌黄（主操作/选中态）分工
+            if (!state.batteryExempt && (state.isRecording || state.hasRecordedOnce) && !state.batteryHintHandled) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(TPAccentYellowLight)
-                        .border(1.dp, TPMustardYellowDark, RoundedCornerShape(8.dp))
+                        .background(TPWarningLight)
+                        .border(1.dp, TPWarning, RoundedCornerShape(8.dp))
                         .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -386,7 +413,7 @@ fun LiveWorkbenchTab(
                     Icon(
                         imageVector = Icons.Filled.BatteryAlert,
                         contentDescription = null,
-                        tint = TPMustardYellowDark,
+                        tint = TPWarning,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
@@ -403,8 +430,9 @@ fun LiveWorkbenchTab(
                         color = TPNavyDark,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(TPMustardYellow)
-                            .clickable { onBatteryExemption() }
+                            .background(Color.White)
+                            .border(1.dp, TPWarning, RoundedCornerShape(6.dp))
+                            .clickable { onBatteryExemption(); onBatteryHintHandled() }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                     Text(
@@ -414,9 +442,20 @@ fun LiveWorkbenchTab(
                         color = TPNavyDark,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(TPMustardYellow)
-                            .clickable { onAutoStartSettings() }
+                            .background(Color.White)
+                            .border(1.dp, TPWarning, RoundedCornerShape(6.dp))
+                            .clickable { onAutoStartSettings(); onBatteryHintHandled() }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                    Text(
+                        text = "知道了",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TPWarningDark,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { onBatteryHintHandled() }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
                     )
                 }
             }
@@ -461,7 +500,7 @@ fun LiveWorkbenchTab(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = "分层流式 ASR",
+                        text = "实时转写",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onSurface

@@ -1,6 +1,7 @@
 package top.tpgofighting.voicebrain.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -87,6 +88,9 @@ data class MainUiState(
 
     // 后台保活状态
     val batteryExempt: Boolean = true,
+    // 电池保活提示只出现一次：首次录音后才提示，处理过（去设置/知道了）不再打扰
+    val batteryHintHandled: Boolean = false,
+    val hasRecordedOnce: Boolean = false,
 
     // 全局提示信息 (Toast / Banner)
     val toastMessage: String? = null
@@ -101,9 +105,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "MainViewModel"
         private const val VOLUME_HISTORY_MAX = 48
+        private const val PREF_BATTERY_HINT_HANDLED = "battery_hint_handled"
+        private const val PREF_HAS_RECORDED_ONCE = "has_recorded_once"
     }
 
     private val apiClient = VoiceBrainApiClient()
+
+    private val prefs by lazy {
+        getApplication<Application>().getSharedPreferences("voicebrain_prefs", Context.MODE_PRIVATE)
+    }
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -120,6 +130,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fetchRemoteData()
         refreshAudioDevices()
         refreshBatteryState()
+        _uiState.update {
+            it.copy(
+                batteryHintHandled = prefs.getBoolean(PREF_BATTERY_HINT_HANDLED, false),
+                hasRecordedOnce = prefs.getBoolean(PREF_HAS_RECORDED_ONCE, false)
+            )
+        }
     }
 
     private fun initWelcomeMessages() {
@@ -204,6 +220,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         showToast("录音音源：$label" + if (_uiState.value.isRecording) "（下段录音生效）" else "")
     }
 
+    /** 电池保活提示处理完毕（点了去设置或「知道了」）：持久化，之后不再展示 */
+    fun onBatteryHintHandled() {
+        _uiState.update { it.copy(batteryHintHandled = true) }
+        prefs.edit().putBoolean(PREF_BATTERY_HINT_HANDLED, true).apply()
+    }
+
     fun refreshBatteryState() {
         _uiState.update {
             it.copy(batteryExempt = KeepAliveHelper.isBatteryOptimizationIgnored(getApplication()))
@@ -256,12 +278,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 recordDurationSeconds = 0,
                 wsStatusText = "正在连接...",
                 wsStatusConnected = false,
-                interimText = "fun-asr-realtime 感知层监听中...",
+                interimText = "正在聆听，开始说话吧…",
                 viewingSessionTitle = null,
                 volumeHistory = emptyList(),
-                micPermissionDenied = false
+                micPermissionDenied = false,
+                hasRecordedOnce = true
             )
         }
+        prefs.edit().putBoolean(PREF_HAS_RECORDED_ONCE, true).apply()
 
         // 启动秒表
         timerJob?.cancel()
