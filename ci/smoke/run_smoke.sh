@@ -69,6 +69,14 @@ anchor 04-memory.xml "全文检索" "memory screen search subtab"
 tap_tab "Obsidian" 04-memory; sleep 3
 shot 05-obsidian; dump 05-obsidian
 anchor 05-obsidian.xml "Obsidian Vault" "obsidian screen title"
+# Data-truth assertion: against the live server the status card must be
+# loaded with real values. If the client field mapping breaks, the card
+# falls back to the honest unknown state and this gate fails.
+if grep -q "状态未知" "$OUT/05-obsidian.xml"; then
+  fail "obsidian status not loaded (field mapping broken or server unreachable)"
+else
+  note "obsidian status loaded with real server data"
+fi
 
 # Liveness + crash checks.
 PID="$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r')"
