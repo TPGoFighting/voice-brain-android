@@ -45,6 +45,15 @@ dismiss_anr() { # emulator launchers occasionally ANR under swiftshader; the
       return 0
     fi
   done
+  # "Wait" did not unwedge the launcher (tight ANR loop, seen on the v1.2.5
+  # hardened run: 7+ Wait taps, dialog kept owning every dump). Force-stop
+  # the launcher process itself; the app under test is launched via am and
+  # does not need the launcher, and a fresh launcher rarely re-wedges.
+  if grep -q "isn.t responding" "$f" 2>/dev/null; then
+    note "launcher ANR loop persists; force-stopping launcher"
+    adb shell am force-stop com.google.android.apps.nexuslauncher 2>/dev/null || true
+    sleep 3
+  fi
 }
 tap_tab() { # <tab label> <dump name the label is read from>
   local coords
@@ -99,8 +108,19 @@ anchor 02-live.xml "开始录音" "live screen record button"
 
 # Drawer + settings page (batch J layout): hamburger opens the drawer with
 # history + settings entry; settings shows the recording group.
+dismiss_anr
 tap_tab "打开菜单" 02-live; sleep 2
 shot 02b-drawer; dump 02b-drawer
+if ! grep -q "历史会话" "$OUT/02b-drawer.xml" 2>/dev/null; then
+  # The launcher ANR dialog can reappear between the pre-tap dump and the
+  # tap itself, swallowing the hamburger tap (v1.2.5 run: dialog visible in
+  # 02b-drawer.png, drawer never opened, all later steps cascaded). Retry
+  # the open once after clearing the dialog before declaring failure.
+  note "drawer anchor missing; retrying drawer open once (ANR race)"
+  dismiss_anr; dump 02-live
+  tap_tab "打开菜单" 02-live; sleep 2
+  shot 02b-drawer; dump 02b-drawer
+fi
 anchor 02b-drawer.xml "历史会话" "drawer history section"
 tap_tab "设置" 02b-drawer; sleep 2
 shot 02c-settings; dump 02c-settings
