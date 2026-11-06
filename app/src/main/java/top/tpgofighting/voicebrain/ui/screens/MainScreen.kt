@@ -39,9 +39,8 @@ import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.haze
 import dev.chrisbanes.haze.hazeEffect
 import top.tpgofighting.voicebrain.ui.components.TPBadge
+import top.tpgofighting.voicebrain.ui.components.TPBadgeVariant
 import top.tpgofighting.voicebrain.ui.components.TPLogoTile
-import top.tpgofighting.voicebrain.ui.components.TPBadge
-import top.tpgofighting.voicebrain.ui.components.TPLogoTileVariant
 import top.tpgofighting.voicebrain.ui.theme.TPMustardYellow
 import top.tpgofighting.voicebrain.ui.theme.TPNavyDark
 import top.tpgofighting.voicebrain.ui.viewmodel.MainViewModel
