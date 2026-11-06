@@ -13,8 +13,8 @@ android {
         applicationId = "top.tpgofighting.voicebrain"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.1.8"
+        versionCode = 14
+        versionName = "1.1.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -95,6 +95,9 @@ dependencies {
 
     // 网络与 WebSocket 全双工流
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // 高斯模糊（底部导航栏毛玻璃）：Haze 1.3.1 与当前 Compose BOM 2024.12（Compose 1.7）同期配套；
+    // Haze 2.x 面向 Compose 1.12，不跟随升级以免连锁升 BOM。
+    implementation("dev.chrisbanes.haze:haze:1.3.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 

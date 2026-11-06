@@ -12,6 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -274,4 +276,26 @@ fun TPMarkdownView(
             }
         }
     }
+}
+
+/**
+ * 按压弹簧缩放：按下时缩到 [pressedScale]，松开弹回。
+ * 用法：给 Button 传同一个 [interactionSource]，再把本修饰符挂在按钮上。
+ * 与录音大按钮的按压反馈（0.97 + MediumBouncy 弹簧）同一套参数，全应用统一触感。
+ */
+@Composable
+fun Modifier.pressScale(
+    interactionSource: androidx.compose.foundation.interaction.MutableInteractionSource,
+    pressedScale: Float = 0.97f
+): Modifier {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) pressedScale else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "pressScale"
+    )
+    return this.then(Modifier.scale(scale))
 }

@@ -1,9 +1,15 @@
 package top.tpgofighting.voicebrain.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -50,6 +56,7 @@ fun speakerColor(speaker: String): Color {
 }
 
 @OptIn(ExperimentalMaterial3Api::class) // ModalBottomSheet 在当前 material3 版本仍标记实验 API
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LiveWorkbenchTab(
     state: MainUiState,
@@ -649,10 +656,15 @@ fun LiveWorkbenchTab(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    // 转写卡通铺到毛玻璃导航栏之下：末句留 80dp 才能滚出栏面
+                    contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
                     items(state.utterances, key = { it.sentenceId }) { u ->
-                        UtteranceItemRow(utterance = u, showCleansed = state.showCleansed)
+                        // 新句入场走 animateItem 淡入 + 弹簧位移，不再硬切
+                        Box(Modifier.animateItem()) {
+                            UtteranceItemRow(utterance = u, showCleansed = state.showCleansed)
+                        }
                     }
                 }
             }
@@ -695,8 +707,32 @@ fun LiveWorkbenchTab(
             title = { Text("历史会话归档", fontSize = 15.sp, fontWeight = FontWeight.Black) },
             text = {
                 if (state.isLoadingSessions) {
-                    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(Modifier.size(24.dp))
+                    // 骨架屏：三行会话占位 + 呼吸式透明度脉动（手写 shimmer，不引额外动效库）
+                    val skeletonTransition = rememberInfiniteTransition(label = "archiveSkeleton")
+                    val skeletonAlpha by skeletonTransition.animateFloat(
+                        initialValue = 0.35f,
+                        targetValue = 0.8f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(750),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "archiveSkeletonAlpha"
+                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        repeat(3) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(46.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = skeletonAlpha * 0.16f)
+                                    )
+                            )
+                        }
                     }
                 } else if (state.sessions.isEmpty()) {
                     Text("暂无历史会话", fontSize = 12.sp, color = Color.Gray)

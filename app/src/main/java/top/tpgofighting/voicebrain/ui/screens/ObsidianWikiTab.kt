@@ -1,5 +1,6 @@
 package top.tpgofighting.voicebrain.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import top.tpgofighting.voicebrain.ui.components.*
 import top.tpgofighting.voicebrain.ui.theme.*
 import top.tpgofighting.voicebrain.ui.viewmodel.MainUiState
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ObsidianWikiTab(
     state: MainUiState,
@@ -198,9 +200,9 @@ fun ObsidianWikiTab(
                     }
                 }
 
-                // 提问输入框
+                // 提问输入框（固定底栏：内容通铺后自带底部间距，停在毛玻璃导航栏上方）
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 88.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -232,7 +234,9 @@ fun ObsidianWikiTab(
             // 双链实体与同步笔记列表
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                // 内容通铺到悬浮毛玻璃导航栏之下：末项留 96dp 才能滚出栏面
+                contentPadding = PaddingValues(bottom = 96.dp)
             ) {
                 // 已同步录音材料笔记
                 item {
@@ -240,7 +244,7 @@ fun ObsidianWikiTab(
                 }
 
                 items(state.obsidianNotes, key = { it.path }) { note ->
-                    TPCard(modifier = Modifier.fillMaxWidth()) {
+                    TPCard(modifier = Modifier.animateItem().fillMaxWidth()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -261,7 +265,7 @@ fun ObsidianWikiTab(
                 }
 
                 items(state.obsidianEntities, key = { it.name }) { entity ->
-                    TPCard(modifier = Modifier.fillMaxWidth()) {
+                    TPCard(modifier = Modifier.animateItem().fillMaxWidth()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,

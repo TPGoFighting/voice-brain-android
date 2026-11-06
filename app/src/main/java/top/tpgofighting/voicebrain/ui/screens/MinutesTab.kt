@@ -106,10 +106,12 @@ fun MinutesTab(
                         Text("切换人设", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
 
+                    val generateInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                     Button(
                         onClick = onGenerateMinutes,
                         enabled = !state.isGeneratingMinutes,
-                        modifier = Modifier.height(36.dp),
+                        interactionSource = generateInteraction,
+                        modifier = Modifier.height(36.dp).pressScale(generateInteraction),
                         shape = RoundedCornerShape(6.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark),
                         contentPadding = PaddingValues(horizontal = 8.dp)
@@ -266,7 +268,11 @@ fun MinutesTab(
                         }
                     }
                 } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        // 内容通铺到悬浮毛玻璃导航栏之下：底部留 96dp 才能滚出栏面
+                        contentPadding = PaddingValues(bottom = 96.dp)
+                    ) {
                         item {
                             TPMarkdownView(markdown = state.polishedDraft)
                         }
@@ -286,7 +292,8 @@ fun MinutesTab(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 96.dp)
                 ) {
                     // 纪要标题与模板标识
                     if (minutes != null) {

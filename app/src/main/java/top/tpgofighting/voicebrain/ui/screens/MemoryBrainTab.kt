@@ -1,6 +1,7 @@
 package top.tpgofighting.voicebrain.ui.screens
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,7 @@ import top.tpgofighting.voicebrain.ui.components.*
 import top.tpgofighting.voicebrain.ui.theme.*
 import top.tpgofighting.voicebrain.ui.viewmodel.MainUiState
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MemoryBrainTab(
     state: MainUiState,
@@ -190,7 +192,9 @@ fun MemoryBrainTab(
 
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                // 内容通铺到悬浮毛玻璃导航栏之下：末项留 96dp 才能滚出栏面
+                contentPadding = PaddingValues(bottom = 96.dp)
             ) {
                 if (filteredMemories.isEmpty()) {
                     item {
@@ -212,8 +216,11 @@ fun MemoryBrainTab(
                                     lineHeight = 16.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                val goRecordInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                                 Button(
                                     onClick = onGoRecord,
+                                    interactionSource = goRecordInteraction,
+                                    modifier = Modifier.pressScale(goRecordInteraction),
                                     shape = RoundedCornerShape(8.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark)
                                 ) {
@@ -230,7 +237,10 @@ fun MemoryBrainTab(
                     }
                 } else {
                     items(filteredMemories, key = { it.id }) { item ->
-                        MemoryCardItem(item)
+                        // 列表项入场/重排走 animateItem 的弹簧位移 + 淡入，不再硬切
+                        Box(Modifier.animateItem()) {
+                            MemoryCardItem(item)
+                        }
                     }
                 }
             }
@@ -315,7 +325,8 @@ fun MemoryBrainTab(
 
                 // 提问输入框
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    // 输入行是固定底栏：内容通铺后要自带底部间距，停在毛玻璃导航栏上方
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 88.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -384,11 +395,13 @@ fun MemoryBrainTab(
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth().weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(bottom = 96.dp)
                     ) {
                         items(state.searchHits, key = { "${it.kind}-${it.sessionId}-${it.text.hashCode()}" }) { hit ->
                             TPCard(
                                 modifier = Modifier
+                                    .animateItem()
                                     .fillMaxWidth()
                                     .clickable(enabled = hit.kind == "transcript" && hit.sessionId.isNotBlank()) {
                                         onOpenSession(hit.sessionId)

@@ -16,9 +16,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeEffect
 import top.tpgofighting.voicebrain.ui.components.TPBadge
 import top.tpgofighting.voicebrain.ui.components.TPBadgeVariant
 import top.tpgofighting.voicebrain.ui.theme.TPMustardYellow
@@ -39,6 +45,9 @@ fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var currentTab by remember { mutableStateOf(NavigationTab.LIVE) }
     val context = LocalContext.current
+    // 底部导航栏毛玻璃：内容层是 haze 源，导航栏是 haze 子层（采样身后内容做高斯模糊）
+    val hazeState = remember { HazeState() }
+    val barSurface = MaterialTheme.colorScheme.surface
 
     // 监听全局 Toast
     LaunchedEffect(uiState.toastMessage) {
@@ -74,8 +83,18 @@ fun MainScreen(viewModel: MainViewModel) {
         },
         bottomBar = {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 4.dp
+                modifier = Modifier.hazeEffect(
+                    state = hazeState,
+                    style = HazeStyle(
+                        backgroundColor = barSurface,
+                        tint = HazeTint(barSurface.copy(alpha = 0.58f)),
+                        blurRadius = 22.dp,
+                        noiseFactor = 0f,
+                        fallbackTint = HazeTint(barSurface.copy(alpha = 0.92f))
+                    )
+                ),
+                containerColor = Color.Transparent,
+                tonalElevation = 0.dp
             ) {
                 NavigationTab.values().forEach { tab ->
                     val isSelected = currentTab == tab
@@ -109,29 +128,42 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
     ) { innerPadding ->
+        // 内容层只避让顶栏、向下通铺到屏幕底边：底部导航栏悬浮其上做毛玻璃，
+        // 各页内部滚动列表自带底部留白（96dp），固定底栏（问答输入框）自带底部间距，不会被遮住。
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .haze(hazeState)
+                .padding(top = innerPadding.calculateTopPadding())
         ) {
             androidx.compose.animation.AnimatedContent(
                 targetState = currentTab,
                 transitionSpec = {
+                    // 方向感知的共享轴：新页从滑动方向一侧以 1/4 屏宽滑入并微微放大，旧页反向滑出淡出
+                    val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                    val springSpec = androidx.compose.animation.core.spring<Float>(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
+                    val slideSpring = androidx.compose.animation.core.spring<IntOffset>(
+                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                    )
                     androidx.compose.animation.ContentTransform(
-                        androidx.compose.animation.fadeIn(
-                            animationSpec = androidx.compose.animation.core.spring(
-                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-                            )
-                        ) + androidx.compose.animation.slideInHorizontally(
-                            animationSpec = androidx.compose.animation.core.spring(
-                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                        androidx.compose.animation.fadeIn(animationSpec = springSpec) +
+                            androidx.compose.animation.slideInHorizontally(
+                                animationSpec = slideSpring,
+                                initialOffsetX = { full -> direction * full / 4 }
+                            ) +
+                            androidx.compose.animation.scaleIn(
+                                initialScale = 0.985f,
+                                animationSpec = springSpec
                             ),
-                            initialOffsetX = { if (targetState.ordinal > initialState.ordinal) 60 else -60 }
-                        ),
                         androidx.compose.animation.fadeOut(
-                            animationSpec = androidx.compose.animation.core.tween(120)
+                            animationSpec = androidx.compose.animation.core.tween(140)
+                        ) + androidx.compose.animation.slideOutHorizontally(
+                            animationSpec = slideSpring,
+                            targetOffsetX = { full -> -direction * full / 6 }
                         )
                     )
                 },
