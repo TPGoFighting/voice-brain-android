@@ -98,7 +98,8 @@ fun MainScreen(viewModel: MainViewModel) {
                         },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = TPNavyDark,
-                            selectedTextColor = TPNavyDark,
+                            // 选中文字在胶囊下方的栏面上：深色模式下深藏青会没入深底，改跟随主题正文色
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
                             indicatorColor = TPMustardYellow,
                             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
