@@ -96,18 +96,20 @@ fun MinutesTab(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     OutlinedButton(
                         onClick = { showPersonaBottomSheet = true },
-                        modifier = Modifier.height(32.dp),
+                        modifier = Modifier.height(36.dp),
                         shape = RoundedCornerShape(6.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        // 主题 primary 是品牌黄，默认描边按钮文字会跟着变黄、在浅底上几乎看不清，显式指定为正文色
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
-                        Text("切换人设", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("切换人设", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Button(
                         onClick = onGenerateMinutes,
                         enabled = !state.isGeneratingMinutes,
-                        modifier = Modifier.height(32.dp),
+                        modifier = Modifier.height(36.dp),
                         shape = RoundedCornerShape(6.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark),
                         contentPadding = PaddingValues(horizontal = 8.dp)
@@ -115,7 +117,7 @@ fun MinutesTab(
                         if (state.isGeneratingMinutes) {
                             CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp, color = TPNavyDark)
                         } else {
-                            Text(if (state.minutes == null) "生成纪要" else "重新生成", fontSize = 10.sp, fontWeight = FontWeight.Black)
+                            Text(if (state.minutes == null) "生成纪要" else "重新生成", fontSize = 11.sp, fontWeight = FontWeight.Black)
                         }
                     }
                 }

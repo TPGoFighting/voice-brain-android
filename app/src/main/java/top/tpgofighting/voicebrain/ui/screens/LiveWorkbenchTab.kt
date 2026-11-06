@@ -762,7 +762,8 @@ fun LiveWorkbenchTab(
                     OutlinedButton(
                         onClick = onDismissMicRationale,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
                     ) {
                         Text("暂不", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }

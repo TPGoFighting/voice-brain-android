@@ -119,7 +119,7 @@ fun MemoryBrainTab(
             OutlinedTextField(
                 value = state.memorySearchQuery,
                 onValueChange = onSetSearchQuery,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
                 placeholder = { Text("只在记忆里筛选，如：决策、承诺...", fontSize = 11.sp) },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
                 shape = RoundedCornerShape(8.dp),
