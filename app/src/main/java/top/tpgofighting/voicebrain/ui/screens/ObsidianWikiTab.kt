@@ -34,6 +34,11 @@ fun ObsidianWikiTab(
     var queryText by remember { mutableStateOf("") }
     var selectedSection by remember { mutableStateOf(0) } // 0: Hermes问答对账, 1: 笔记与实体网络
 
+    // 进入本页时若状态尚未加载成功（如启动时离线），自动重试一次
+    LaunchedEffect(state.obsidianStatus.loaded) {
+        if (!state.obsidianStatus.loaded) onRefreshObsidianStatus()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
