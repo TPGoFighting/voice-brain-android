@@ -2,6 +2,9 @@ package top.tpgofighting.voicebrain.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,10 +12,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import com.composables.icons.lucide.Brain
+import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Menu
 import com.composables.icons.lucide.Mic
 import com.composables.icons.lucide.Network
 import com.composables.icons.lucide.NotebookText
+import com.composables.icons.lucide.RefreshCw
+import com.composables.icons.lucide.Settings2
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +32,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -46,13 +54,24 @@ enum class NavigationTab(val label: String, val icon: ImageVector) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(
+    viewModel: MainViewModel,
+    themeMode: String = "system",
+    onThemeModeChange: (String) -> Unit = {}
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var currentTab by remember { mutableStateOf(NavigationTab.LIVE) }
     val context = LocalContext.current
     // 底部导航栏毛玻璃：内容层是 haze 源，导航栏是 haze 子层（采样身后内容做高斯模糊）
     val hazeState = remember { HazeState() }
     val barSurface = MaterialTheme.colorScheme.surface
+    // 批次 J 布局：侧边抽屉（导航 + 历史会话 + 设置入口）与设置页
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    var showSettings by remember { mutableStateOf(false) }
+    LaunchedEffect(drawerState.isOpen) {
+        if (drawerState.isOpen) viewModel.refreshSessions()
+    }
 
     // 监听全局 Toast
     LaunchedEffect(uiState.toastMessage) {
@@ -62,9 +81,51 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     }
 
+    if (showSettings) {
+        SettingsScreen(
+            state = uiState,
+            themeMode = themeMode,
+            onThemeModeChange = onThemeModeChange,
+            onSetSilence = { viewModel.setSentenceSilence(it) },
+            onToggleCleansed = { viewModel.toggleShowCleansed(it) },
+            onBatteryExemption = { viewModel.requestBatteryExemption() },
+            onAutoStartSettings = { viewModel.openAutoStartSettings() },
+            onBack = { showSettings = false }
+        )
+        return
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawerSheet(
+                state = uiState,
+                currentTab = currentTab,
+                onSelectTab = { tab ->
+                    currentTab = tab
+                    scope.launch { drawerState.close() }
+                },
+                onOpenSession = { sessionId ->
+                    viewModel.loadSession(sessionId)
+                    currentTab = NavigationTab.LIVE
+                    scope.launch { drawerState.close() }
+                },
+                onRefreshSessions = { viewModel.refreshSessions() },
+                onOpenSettings = {
+                    scope.launch { drawerState.close() }
+                    showSettings = true
+                }
+            )
+        }
+    ) {
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                        Icon(Lucide.Menu, contentDescription = "打开菜单", modifier = Modifier.size(20.dp))
+                    }
+                },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Box(
@@ -236,6 +297,161 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
             }
             }
+        }
+    }
+    }
+}
+
+/**
+ * 侧边抽屉（批次 J）：主流软件式布局——品牌头 + 主导航 + 历史会话 + 设置入口。
+ * 底部导航保留拇指区快捷切换，抽屉承载历史与设置这类低频但重要的入口。
+ */
+@Composable
+private fun AppDrawerSheet(
+    state: top.tpgofighting.voicebrain.ui.viewmodel.MainUiState,
+    currentTab: NavigationTab,
+    onSelectTab: (NavigationTab) -> Unit,
+    onOpenSession: (String) -> Unit,
+    onRefreshSessions: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    ModalDrawerSheet(
+        modifier = Modifier.width(300.dp),
+        drawerContainerColor = MaterialTheme.colorScheme.surface,
+        drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // 品牌头
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .border(1.5.dp, TPNavyDark, RoundedCornerShape(8.dp))
+                        .background(TPMustardYellow, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text("TP", fontSize = 13.sp, fontWeight = FontWeight.Black, color = TPNavyDark)
+                }
+                Column {
+                    Text("Voice Brain", fontSize = 15.sp, fontWeight = FontWeight.Black)
+                    Text("AI 录音豆", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+
+            // 主导航
+            NavigationTab.values().forEach { tab ->
+                val selected = tab == currentTab
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (selected) TPMustardYellow else Color.Transparent,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable { onSelectTab(tab) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        tab.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        tab.label,
+                        fontSize = 13.sp,
+                        fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+                        color = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+            Spacer(Modifier.height(10.dp))
+
+            // 历史会话
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(Lucide.History, contentDescription = null, modifier = Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("历史会话", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                }
+                IconButton(onClick = onRefreshSessions, modifier = Modifier.size(28.dp)) {
+                    Icon(Lucide.RefreshCw, contentDescription = "刷新会话", modifier = Modifier.size(14.dp))
+                }
+            }
+            if (state.sessions.isEmpty()) {
+                Text(
+                    "暂无历史会话，录一段就会出现在这里",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+                )
+            } else {
+                state.sessions.take(8).forEach { session ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenSession(session.id) }
+                            .padding(horizontal = 4.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            session.title.ifBlank { "未命名会话" },
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        val metaParts = mutableListOf<String>()
+                        if (session.stamp.isNotBlank()) metaParts += session.stamp
+                        if (session.durationLabel.isNotBlank()) metaParts += session.durationLabel
+                        if (session.utteranceCount > 0) metaParts += "${session.utteranceCount} 句"
+                        val meta = metaParts.joinToString(" · ")
+                        if (meta.isNotBlank()) {
+                            Text(meta, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+            Spacer(Modifier.height(10.dp))
+
+            // 设置入口
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenSettings() }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Lucide.Settings2, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("设置", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "voice.tpgofighting.top",
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 12.dp)
+            )
         }
     }
 }

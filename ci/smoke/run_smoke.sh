@@ -97,6 +97,17 @@ dismiss_anr
 shot 02-live; dump 02-live
 anchor 02-live.xml "开始录音" "live screen record button"
 
+# Drawer + settings page (batch J layout): hamburger opens the drawer with
+# history + settings entry; settings shows the recording group.
+tap_tab "打开菜单" 02-live; sleep 2
+shot 02b-drawer; dump 02b-drawer
+anchor 02b-drawer.xml "历史会话" "drawer history section"
+tap_tab "设置" 02b-drawer; sleep 2
+shot 02c-settings; dump 02c-settings
+anchor 02c-settings.xml "断句阈值" "settings page recording group"
+adb shell input keyevent 4; sleep 1
+dump 02-live
+
 tap_tab "纪要决策" 02-live; sleep 3
 shot 03-minutes; dump 03-minutes
 anchor 03-minutes.xml "纪要与决策" "minutes screen title"

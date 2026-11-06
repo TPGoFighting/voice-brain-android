@@ -64,8 +64,26 @@ class MainActivity : ComponentActivity() {
         observeRecordingKeepScreenOn()
 
         setContent {
-            TPVoiceBrainTheme {
-                MainScreen(viewModel = viewModel)
+            // 主题模式（设置页可改）：system 跟随系统 / light 浅色 / dark 深色，持久化在 voicebrain_prefs
+            val prefs = remember { getSharedPreferences("voicebrain_prefs", MODE_PRIVATE) }
+            var themeMode by remember {
+                androidx.compose.runtime.mutableStateOf(prefs.getString("theme_mode", "system") ?: "system")
+            }
+            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val darkTheme = when (themeMode) {
+                "dark" -> true
+                "light" -> false
+                else -> systemDark
+            }
+            TPVoiceBrainTheme(darkTheme = darkTheme) {
+                MainScreen(
+                    viewModel = viewModel,
+                    themeMode = themeMode,
+                    onThemeModeChange = { mode ->
+                        themeMode = mode
+                        prefs.edit().putString("theme_mode", mode).apply()
+                    }
+                )
             }
         }
 
