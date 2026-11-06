@@ -21,6 +21,20 @@ dump() {
   adb shell uiautomator dump /sdcard/dump.xml >/dev/null 2>&1
   adb pull /sdcard/dump.xml "$OUT/$1.xml" >/dev/null 2>&1 || note "dump $1 failed"
 }
+dismiss_anr() { # emulator launchers occasionally ANR under swiftshader; the
+  # system dialog then owns the UI hierarchy and every anchor fails even
+  # though the app rendered fine underneath. Tap "Wait" to hand focus back.
+  local f="$OUT/anr-check.xml" coords
+  adb shell uiautomator dump /sdcard/anr.xml >/dev/null 2>&1
+  adb pull /sdcard/anr.xml "$f" >/dev/null 2>&1
+  if grep -q "isn.t responding" "$f" 2>/dev/null; then
+    if coords="$(python3 "$HERE/tap_text.py" "$f" "Wait")"; then
+      note "system ANR dialog present; tapping Wait ($coords)"
+      adb shell input tap $coords
+      sleep 2
+    fi
+  fi
+}
 tap_tab() { # <tab label> <dump name the label is read from>
   local coords
   if coords="$(python3 "$HERE/tap_text.py" "$OUT/$2.xml" "$1")"; then
@@ -68,6 +82,7 @@ fi
 adb shell pm grant "$PKG" android.permission.RECORD_AUDIO 2>/dev/null || true
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 sleep 2
+dismiss_anr
 shot 02-live; dump 02-live
 anchor 02-live.xml "开始录音" "live screen record button"
 
