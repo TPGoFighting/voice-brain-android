@@ -137,6 +137,19 @@ tap_tab "Obsidian" 08-dark-memory; sleep 3
 shot 09-dark-obsidian; dump 09-dark-obsidian
 adb shell cmd uimode night no >/dev/null 2>&1 || true
 
+# Global recording entries (v1.1.6): the QS tile service and the
+# home-screen widget receiver must be registered in the package.
+if adb shell dumpsys package "$PKG" | grep -q "RecordWidgetProvider"; then
+  note "home-screen widget receiver registered"
+else
+  fail "widget receiver not registered"
+fi
+if adb shell dumpsys package "$PKG" | grep -q "RecordingTileService"; then
+  note "quick-settings tile service registered"
+else
+  fail "QS tile service not registered"
+fi
+
 # Liveness + crash checks.
 PID="$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r')"
 if [ -n "$PID" ]; then note "process alive: pid $PID"; else fail "app process not running at end"; fi
