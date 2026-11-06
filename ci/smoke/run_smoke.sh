@@ -73,7 +73,7 @@ anchor 02-live.xml "开始录音" "live screen record button"
 
 tap_tab "纪要决策" 02-live; sleep 3
 shot 03-minutes; dump 03-minutes
-anchor 03-minutes.xml "结构化纪要与决策对账" "minutes screen title"
+anchor 03-minutes.xml "纪要与决策" "minutes screen title"
 
 tap_tab "记忆大脑" 03-minutes; sleep 3
 shot 04-memory; dump 04-memory
@@ -116,6 +116,26 @@ if grep -q "状态未知" "$OUT/05-obsidian.xml"; then
 else
   note "obsidian status loaded with real server data"
 fi
+
+# Dark-mode pass: the theme follows the system. Flip the emulator to
+# night mode, relaunch, and re-walk the tabs (screenshots 06-09) with a
+# light anchor check. If the uimode switch silently fails the shots will
+# show the light theme and a human reviewing the artifact will notice.
+note "switching emulator to night mode"
+adb shell cmd uimode night yes >/dev/null 2>&1 || true
+sleep 3
+adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
+adb shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1
+sleep 6
+shot 06-dark-live; dump 06-dark-live
+anchor 06-dark-live.xml "开始录音" "dark mode live screen record button"
+tap_tab "纪要决策" 06-dark-live; sleep 3
+shot 07-dark-minutes; dump 07-dark-minutes
+tap_tab "记忆大脑" 07-dark-minutes; sleep 3
+shot 08-dark-memory; dump 08-dark-memory
+tap_tab "Obsidian" 08-dark-memory; sleep 3
+shot 09-dark-obsidian; dump 09-dark-obsidian
+adb shell cmd uimode night no >/dev/null 2>&1 || true
 
 # Liveness + crash checks.
 PID="$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r')"
