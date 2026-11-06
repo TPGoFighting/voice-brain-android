@@ -17,6 +17,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import top.tpgofighting.voicebrain.ui.screens.MainScreen
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import top.tpgofighting.voicebrain.ui.theme.TPVoiceBrainTheme
 import top.tpgofighting.voicebrain.ui.viewmodel.MainUiEvent
 import top.tpgofighting.voicebrain.ui.viewmodel.MainViewModel
