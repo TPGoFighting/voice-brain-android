@@ -12,7 +12,7 @@ import com.airbnb.lottie.compose.LottieDynamicProperties
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.airbnb.lottie.compose.rememberLottieDynamicProperties
 import com.airbnb.lottie.compose.rememberLottieDynamicProperty
-import com.airbnb.lottie.compose.LottieProperty
+import com.airbnb.lottie.LottieProperty
 
 /**
  * 简笔画线条动画（批次 I）：素材来自 LottieFiles 免费库（Lottie Simple License），
