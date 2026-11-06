@@ -27,6 +27,13 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # Diagnostic only: is the production API reachable from this
+      # runner's network at all? (Datacenter ranges have been reset by
+      # the CDN before; the result explains data-assertion skips.)
+      - name: Probe API reachability from runner (diagnostic)
+        continue-on-error: true
+        run: curl -sS -m 15 https://voice.tpgofighting.top/api/obsidian/status || echo "RUNNER_CANNOT_REACH_API"
+
       - name: Download release APK
         env:
           GH_TOKEN: ${{ github.token }}
