@@ -42,6 +42,17 @@ adb wait-for-device
 until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 2; done
 note "device booted"
 
+# The emulator's DNS can lag a few seconds behind boot; the app fetches
+# remote data at startup, so wait until the API host resolves before
+# launching (first v1.1.1 run failed its data assertion on exactly this).
+for i in $(seq 1 45); do
+  if adb shell ping -c 1 -W 2 voice.tpgofighting.top >/dev/null 2>&1; then
+    note "dns ok after ${i} tries"
+    break
+  fi
+  sleep 2
+done
+
 note "installing $APK"
 adb install -r "$APK" || fail "adb install failed"
 
