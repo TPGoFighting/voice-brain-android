@@ -48,6 +48,7 @@ fun speakerColor(speaker: String): Color {
     return SPEAKER_COLORS[(speaker.hashCode() and Int.MAX_VALUE) % SPEAKER_COLORS.size]
 }
 
+@OptIn(ExperimentalMaterial3Api::class) // ModalBottomSheet 在当前 material3 版本仍标记实验 API
 @Composable
 fun LiveWorkbenchTab(
     state: MainUiState,
