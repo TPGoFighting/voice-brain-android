@@ -77,7 +77,7 @@ anchor 03-minutes.xml "结构化纪要与决策对账" "minutes screen title"
 
 tap_tab "记忆大脑" 03-minutes; sleep 3
 shot 04-memory; dump 04-memory
-anchor 04-memory.xml "全文检索" "memory screen search subtab"
+anchor 04-memory.xml "搜逐字稿" "memory screen transcript-search subtab"
 
 # Memory empty state (v1.1.2): with no memories the library must explain
 # itself and offer a way to record, not sit blank. When the API answered
