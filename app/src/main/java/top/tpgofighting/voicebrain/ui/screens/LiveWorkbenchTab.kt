@@ -210,6 +210,15 @@ fun LiveWorkbenchTab(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // 当前实际生效的音源：录音中取系统路由结果，否则取手动选择，
+                // 再否则取自动优选（DJI 领夹麦 > USB > 内置）
+                val activeDevice = when {
+                    state.isRecording -> state.audioDevices.firstOrNull { it.name == state.activeDeviceLabel }
+                    state.selectedDeviceId != null -> state.audioDevices.firstOrNull { it.id == state.selectedDeviceId }
+                    else -> state.audioDevices.firstOrNull { it.isDji }
+                        ?: state.audioDevices.firstOrNull { it.kind == "usb" }
+                }
+                val externalActive = activeDevice != null && activeDevice.kind != "builtin"
                 Box {
                     val currentLabel = when {
                         state.isRecording -> state.activeDeviceLabel
@@ -222,7 +231,7 @@ fun LiveWorkbenchTab(
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .background(if (externalActive) TPAccentGreenLight else MaterialTheme.colorScheme.surfaceVariant)
                             .clickable { showDeviceMenu = true }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -232,7 +241,7 @@ fun LiveWorkbenchTab(
                             text = currentLabel,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = if (activeDevice?.isDji == true) TPAccentGreen else MaterialTheme.colorScheme.onSurface
                         )
                         Icon(
                             imageVector = Icons.Filled.ArrowDropDown,
@@ -265,8 +274,14 @@ fun LiveWorkbenchTab(
                         }
                     }
                 }
-                if (state.audioDevices.any { it.isDji }) {
-                    TPBadge(text = "DJI 已接入", variant = TPBadgeVariant.GREEN)
+                // 音源状态徽标：正在用领夹麦/外接麦要一眼可见；只是接了没在用则弱提示
+                when {
+                    activeDevice?.isDji == true ->
+                        TPBadge(text = "领夹麦使用中", variant = TPBadgeVariant.GREEN)
+                    externalActive ->
+                        TPBadge(text = "外接麦使用中", variant = TPBadgeVariant.GREEN)
+                    state.audioDevices.any { it.isDji } ->
+                        TPBadge(text = "DJI 已接入", variant = TPBadgeVariant.BLUE)
                 }
             }
 
