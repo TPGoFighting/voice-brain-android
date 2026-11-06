@@ -69,7 +69,7 @@ adb shell pm grant "$PKG" android.permission.RECORD_AUDIO 2>/dev/null || true
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 sleep 2
 shot 02-live; dump 02-live
-anchor 02-live.xml "开始实时录音" "live screen record button"
+anchor 02-live.xml "开始录音" "live screen record button"
 
 tap_tab "纪要决策" 02-live; sleep 3
 shot 03-minutes; dump 03-minutes
