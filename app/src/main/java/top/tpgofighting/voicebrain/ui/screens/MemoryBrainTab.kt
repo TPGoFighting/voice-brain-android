@@ -76,7 +76,7 @@ fun MemoryBrainTab(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon(Icons.Filled.Folder, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Text("记忆资产库 (${state.memories.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("记忆 (${state.memories.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -108,7 +108,7 @@ fun MemoryBrainTab(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon(Icons.Filled.ManageSearch, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Text("全文检索", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("搜逐字稿", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -120,7 +120,7 @@ fun MemoryBrainTab(
                 value = state.memorySearchQuery,
                 onValueChange = onSetSearchQuery,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
-                placeholder = { Text("搜索长期记忆、方案、决策标签...", fontSize = 11.sp) },
+                placeholder = { Text("只在记忆里筛选，如：决策、承诺...", fontSize = 11.sp) },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
                 shape = RoundedCornerShape(8.dp),
                 singleLine = true
@@ -239,6 +239,13 @@ fun MemoryBrainTab(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // 分工说明：与 Obsidian 页的仓库问答区分开，一句话讲清
+                Text(
+                    "这里问的是你的录音和记忆；想查整个 Obsidian 仓库的笔记，去 Obsidian 页问。",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 // 快捷提问胶囊
                 val suggestions = listOf(
                     "总结我最近关于全双工架构的偏好",
@@ -315,7 +322,7 @@ fun MemoryBrainTab(
                         value = inputQuery,
                         onValueChange = { inputQuery = it },
                         modifier = Modifier.weight(1f).height(46.dp),
-                        placeholder = { Text("问问第二大脑...", fontSize = 11.sp) },
+                        placeholder = { Text("问录音和记忆里的事，如：限流方案定了吗", fontSize = 11.sp) },
                         shape = RoundedCornerShape(8.dp),
                         singleLine = true
                     )
