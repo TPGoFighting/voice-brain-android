@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Square
 import top.tpgofighting.voicebrain.model.ActionItem
 import top.tpgofighting.voicebrain.model.Persona

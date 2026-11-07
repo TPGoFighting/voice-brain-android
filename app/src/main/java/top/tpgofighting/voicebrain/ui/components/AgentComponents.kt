@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import top.tpgofighting.voicebrain.ui.theme.TPAccentBlue
+import top.tpgofighting.voicebrain.ui.theme.TPMustardYellowDark
 
 /**
  * Agent 专属组件族（批次 H）。
