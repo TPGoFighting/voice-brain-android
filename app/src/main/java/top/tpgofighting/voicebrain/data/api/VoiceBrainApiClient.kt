@@ -17,6 +17,22 @@ data class BrainAnswer(
     val sources: List<BrainSource> = emptyList()
 )
 
+/** Obsidian 问答结果：服务端 {ok, answer, sources:[{path,title}], backend, writtenBack, writeBackPath} */
+data class ObsidianAskResult(
+    val answer: String,
+    val sources: List<ObsidianSourceRef> = emptyList(),
+    val backend: String = "",
+    val writtenBack: Boolean = false,
+    val writeBackPath: String = ""
+)
+
+/** Vault 笔记原文（GET /api/obsidian/note） */
+data class VaultNoteResult(
+    val path: String = "",
+    val title: String = "",
+    val body: String = ""
+)
+
 /** 说话人分离的一句（离线精转写） */
 data class DiarizedSentence(
     val beginMs: Long,
@@ -500,7 +516,7 @@ class VoiceBrainApiClient(
         query: String,
         targetNotePath: String? = null,
         autoWriteBack: Boolean = false
-    ): Result<Pair<String, List<String>>> = withContext(Dispatchers.IO) {
+    ): Result<ObsidianAskResult> = withContext(Dispatchers.IO) {
         try {
             val bodyJson = buildJsonObject {
                 put("query", query)
@@ -520,11 +536,66 @@ class VoiceBrainApiClient(
             }
 
             val obj = json.parseToJsonElement(respBody).jsonObject
-            val answer = obj["answer"]?.jsonPrimitive?.content ?: ""
-            val sources = obj["sources"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
-            Result.success(Pair(answer, sources))
+            if (obj["ok"]?.jsonPrimitive?.booleanOrNull == false) {
+                val err = obj["error"]?.jsonPrimitive?.contentOrNull ?: "知识库问答失败"
+                return@withContext Result.failure(Exception(err))
+            }
+            // 契约（v1.3.5 修复）：sources 是对象数组 [{path, title}]，不是字符串数组；
+            // 此前按 List<String> 解析在真机上必然抛异常，问答永远落到失败兜底。
+            // 同时容忍旧式字符串条目，避免服务端形状微调再次打穿。
+            val sources = obj["sources"]?.jsonArray?.mapNotNull { el ->
+                when (el) {
+                    is JsonObject -> {
+                        val path = el["path"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                        ObsidianSourceRef(
+                            path = path,
+                            title = el["title"]?.jsonPrimitive?.contentOrNull ?: path
+                        )
+                    }
+                    is JsonPrimitive -> el.contentOrNull?.let { ObsidianSourceRef(path = it, title = it) }
+                    else -> null
+                }
+            } ?: emptyList()
+            Result.success(
+                ObsidianAskResult(
+                    answer = obj["answer"]?.jsonPrimitive?.content ?: "",
+                    sources = sources,
+                    backend = obj["backend"]?.jsonPrimitive?.contentOrNull ?: "",
+                    writtenBack = obj["writtenBack"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    writeBackPath = obj["writeBackPath"]?.jsonPrimitive?.contentOrNull ?: ""
+                )
+            )
         } catch (e: Exception) {
             Log.e(TAG, "askObsidianVault failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /** 读取 Vault 笔记原文（GET /api/obsidian/note?path=…） */
+    suspend fun fetchVaultNote(path: String): Result<VaultNoteResult> = withContext(Dispatchers.IO) {
+        try {
+            val url = "$baseUrl/api/obsidian/note?path=${java.net.URLEncoder.encode(path, "UTF-8")}"
+            val request = Request.Builder().url(url).get().build()
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}"))
+            }
+            val obj = json.parseToJsonElement(respBody).jsonObject
+            if (obj["ok"]?.jsonPrimitive?.booleanOrNull == false) {
+                val err = obj["error"]?.jsonPrimitive?.contentOrNull ?: "笔记读取失败"
+                return@withContext Result.failure(Exception(err))
+            }
+            Result.success(
+                VaultNoteResult(
+                    path = obj["path"]?.jsonPrimitive?.contentOrNull ?: path,
+                    title = obj["title"]?.jsonPrimitive?.contentOrNull ?: path,
+                    body = obj["body"]?.jsonPrimitive?.contentOrNull
+                        ?: obj["content"]?.jsonPrimitive?.contentOrNull ?: ""
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchVaultNote failed: ${e.message}", e)
             Result.failure(e)
         }
     }

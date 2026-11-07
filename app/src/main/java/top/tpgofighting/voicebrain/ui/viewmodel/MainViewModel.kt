@@ -80,6 +80,10 @@ data class MainUiState(
     val obsidianEntities: List<LmmWikiEntity> = emptyList(),
     val obsidianChatHistory: List<BrainChatMessage> = emptyList(),
     val isObsidianThinking: Boolean = false,
+    // v1.3.5: 问答起始时刻（elapsedRealtime），供思考头/DAG 实时计时；0 = 未在思考
+    val obsidianThinkingSince: Long = 0L,
+    // v1.3.5: 笔记原文查看弹窗状态；null = 未打开
+    val vaultNote: VaultNoteUiState? = null,
     val autoWriteBackEnabled: Boolean = true,
 
     // 麦克风权限（按需申请：首次点开始先弹用途说明，被拒后给出恢复入口）
@@ -94,6 +98,15 @@ data class MainUiState(
 
     // 全局提示信息 (Toast / Banner)
     val toastMessage: String? = null
+)
+
+/** 笔记原文查看弹窗状态（v1.3.5） */
+data class VaultNoteUiState(
+    val loading: Boolean = true,
+    val title: String = "",
+    val path: String = "",
+    val body: String = "",
+    val error: String = ""
 )
 
 sealed class MainUiEvent {
@@ -124,6 +137,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var audioRecorder: AudioRecorderManager? = null
     private var webSocketManager: AsrWebSocketManager? = null
     private var timerJob: Job? = null
+    private var obsidianAskJob: Job? = null
 
     init {
         initWelcomeMessages()
@@ -749,7 +763,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun askObsidian(question: String) {
         val q = question.trim()
         if (q.isBlank()) return
+        if (_uiState.value.isObsidianThinking) return
 
+        val startedAt = android.os.SystemClock.elapsedRealtime()
         val userMsg = BrainChatMessage(
             id = "obs-user-${System.currentTimeMillis()}",
             isUser = true,
@@ -760,38 +776,113 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update {
             it.copy(
                 obsidianChatHistory = it.obsidianChatHistory + userMsg,
-                isObsidianThinking = true
+                isObsidianThinking = true,
+                obsidianThinkingSince = startedAt
             )
         }
 
-        viewModelScope.launch {
+        obsidianAskJob = viewModelScope.launch {
             val targetNote = _uiState.value.obsidianNotes.firstOrNull()?.path
             val result = apiClient.askObsidianVault(
                 query = q,
                 targetNotePath = targetNote,
                 autoWriteBack = _uiState.value.autoWriteBackEnabled
             )
+            // 已被 stopObsidianAsk 取消时不再落结果
+            if (!isActive) return@launch
 
-            val (ans, sources) = result.getOrNull() ?: Pair("连接知识库异常，请确保网络通畅", emptyList())
-            val assistantMsg = BrainChatMessage(
-                id = "obs-hermes-${System.currentTimeMillis()}",
-                isUser = false,
-                content = ans,
-                timestamp = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
-                citations = sources
-            )
+            val elapsed = (android.os.SystemClock.elapsedRealtime() - startedAt) / 1000f
+            val data = result.getOrNull()
+            val assistantMsg = if (data != null) {
+                BrainChatMessage(
+                    id = "obs-asst-${System.currentTimeMillis()}",
+                    isUser = false,
+                    content = data.answer,
+                    timestamp = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
+                    citations = data.sources.map { it.title },
+                    sourceRefs = data.sources,
+                    backendLabel = if (data.backend.contains("hermes", ignoreCase = true)) "Hermes Agent" else "Obsidian Agent",
+                    elapsedSec = elapsed,
+                    writtenBackPath = if (data.writtenBack) data.writeBackPath else ""
+                )
+            } else {
+                BrainChatMessage(
+                    id = "obs-asst-${System.currentTimeMillis()}",
+                    isUser = false,
+                    content = "连接知识库异常，请确保网络通畅",
+                    timestamp = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
+                    elapsedSec = elapsed,
+                    isError = true
+                )
+            }
 
             _uiState.update {
                 it.copy(
                     obsidianChatHistory = it.obsidianChatHistory + assistantMsg,
-                    isObsidianThinking = false
+                    isObsidianThinking = false,
+                    obsidianThinkingSince = 0L
                 )
             }
 
-            if (_uiState.value.autoWriteBackEnabled && result.isSuccess) {
-                showToast("Hermes 思考已自动追加写回 Obsidian 笔记！")
+            if (data != null && data.writtenBack) {
+                showToast("回答已自动追加写回 Obsidian 笔记")
             }
         }
+    }
+
+    /** 停止进行中的 Obsidian 问答：取消请求并落一条「已停止生成」 */
+    fun stopObsidianAsk() {
+        val job = obsidianAskJob ?: return
+        if (!_uiState.value.isObsidianThinking) return
+        val startedAt = _uiState.value.obsidianThinkingSince
+        job.cancel()
+        obsidianAskJob = null
+        val elapsed = if (startedAt > 0L) {
+            (android.os.SystemClock.elapsedRealtime() - startedAt) / 1000f
+        } else null
+        val stopMsg = BrainChatMessage(
+            id = "obs-stop-${System.currentTimeMillis()}",
+            isUser = false,
+            content = "已停止生成",
+            timestamp = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date()),
+            elapsedSec = elapsed
+        )
+        _uiState.update {
+            it.copy(
+                obsidianChatHistory = it.obsidianChatHistory + stopMsg,
+                isObsidianThinking = false,
+                obsidianThinkingSince = 0L
+            )
+        }
+    }
+
+    /** 打开笔记原文查看弹窗 */
+    fun openVaultNote(path: String) {
+        if (path.isBlank()) return
+        _uiState.update { it.copy(vaultNote = VaultNoteUiState(loading = true, path = path)) }
+        viewModelScope.launch {
+            val result = apiClient.fetchVaultNote(path)
+            // 弹窗已关闭或已切换到别的笔记时，丢弃这次结果
+            if (_uiState.value.vaultNote?.path != path) return@launch
+            val data = result.getOrNull()
+            _uiState.update {
+                it.copy(
+                    vaultNote = if (data != null) {
+                        VaultNoteUiState(loading = false, title = data.title, path = data.path, body = data.body)
+                    } else {
+                        VaultNoteUiState(
+                            loading = false,
+                            path = path,
+                            error = result.exceptionOrNull()?.message ?: "笔记读取失败"
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    fun closeVaultNote() {
+        _uiState.update { it.copy(vaultNote = null) }
     }
 
     fun showToast(msg: String) {

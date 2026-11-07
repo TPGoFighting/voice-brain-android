@@ -323,6 +323,9 @@ fun MainScreen(
                         state = uiState,
                         onToggleAutoWriteBack = { viewModel.toggleAutoWriteBack() },
                         onAskObsidian = { viewModel.askObsidian(it) },
+                        onStopObsidian = { viewModel.stopObsidianAsk() },
+                        onOpenVaultNote = { viewModel.openVaultNote(it) },
+                        onCloseVaultNote = { viewModel.closeVaultNote() },
                         onRefreshObsidianStatus = { viewModel.refreshObsidianStatus() }
                     )
                 }

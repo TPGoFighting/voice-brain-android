@@ -194,6 +194,12 @@ data class BrainSource(
     val text: String = ""
 )
 
+/** Obsidian 问答的引用来源（服务端 /api/obsidian/ask 返回 [{path, title}] 对象） */
+data class ObsidianSourceRef(
+    val path: String = "",
+    val title: String = ""
+)
+
 data class BrainChatMessage(
     val id: String,
     val isUser: Boolean,
@@ -201,7 +207,13 @@ data class BrainChatMessage(
     val timestamp: String,
     val citations: List<String> = emptyList(),
     val sources: List<BrainSource> = emptyList(),
-    val isStreaming: Boolean = false
+    val isStreaming: Boolean = false,
+    // v1.3.5 Obsidian Agent 对话元数据（记忆页不使用，保持默认）
+    val sourceRefs: List<ObsidianSourceRef> = emptyList(),
+    val backendLabel: String = "",
+    val elapsedSec: Float? = null,
+    val writtenBackPath: String = "",
+    val isError: Boolean = false
 )
 
 /** 全文检索命中（GET /api/search） */

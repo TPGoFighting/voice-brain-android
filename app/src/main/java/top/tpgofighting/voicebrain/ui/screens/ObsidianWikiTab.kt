@@ -35,9 +35,11 @@ fun ObsidianWikiTab(
     state: MainUiState,
     onToggleAutoWriteBack: () -> Unit,
     onAskObsidian: (String) -> Unit,
+    onStopObsidian: () -> Unit,
+    onOpenVaultNote: (String) -> Unit,
+    onCloseVaultNote: () -> Unit,
     onRefreshObsidianStatus: () -> Unit
 ) {
-    var queryText by remember { mutableStateOf("") }
     var selectedSection by remember { mutableStateOf(0) } // 0: Hermes问答对账, 1: 笔记与实体网络
     var showVaultPath by remember { mutableStateOf(false) } // 服务器绝对路径默认不展示，点按才展开
 
@@ -153,96 +155,15 @@ fun ObsidianWikiTab(
 
         // 3. 内容展示区
         if (selectedSection == 0) {
-            // Hermes 问答对话流
-            Column(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // 分工说明：与记忆页的录音问答区分开，一句话讲清
-                Text(
-                    "查仓库笔记正文；录音内容去「记忆大脑」页问。",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                // 示例问题（与第二大脑页对齐的首轮脚手架，批次 R 补齐）
-                androidx.compose.foundation.layout.FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    AgentSuggestionChip(text = "仓库里最近在更新什么主题", onClick = { onAskObsidian("仓库里最近在更新什么主题") })
-                    AgentSuggestionChip(text = "LLM-Wiki 的核心概念是什么", onClick = { onAskObsidian("LLM-Wiki 的核心概念是什么") })
-                    AgentSuggestionChip(text = "我的项目笔记里有哪些待办", onClick = { onAskObsidian("我的项目笔记里有哪些待办") })
-                }
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(state.obsidianChatHistory, key = { it.id }) { msg ->
-                        ChatBubbleRow(msg, agentName = "Hermes Agent")
-                    }
-
-                    if (state.isObsidianThinking) {
-                        // 与记忆页统一的思考态：Agent 名称行 + 柔面气泡里的 Lottie 三点
-                        item {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                    modifier = Modifier.padding(start = 2.dp)
-                                ) {
-                                    Icon(Lucide.Brain, contentDescription = null, modifier = Modifier.size(14.dp), tint = brandAccentColor())
-                                    Text("Hermes Agent", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                            RoundedCornerShape(topStart = 6.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)
-                                        )
-                                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                                ) {
-                                    AgentTypingIndicator(label = "正在检索仓库笔记与双链")
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 提问输入框（固定底栏：内容通铺后自带底部间距，停在毛玻璃导航栏上方）
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 100.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    OutlinedTextField(
-                        value = queryText,
-                        onValueChange = { queryText = it },
-                        modifier = Modifier.weight(1f).height(52.dp),
-                        placeholder = { Text("查仓库笔记，如：点云论文笔记在哪", fontSize = 11.sp) },
-                        shape = RoundedCornerShape(TPRadius.md),
-                        singleLine = true
-                    )
-
-                    Button(
-                        onClick = {
-                            if (queryText.isNotBlank()) {
-                                onAskObsidian(queryText)
-                                queryText = ""
-                            }
-                        },
-                        modifier = Modifier.size(46.dp),
-                        shape = RoundedCornerShape(50),
-                        contentPadding = PaddingValues(0.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (queryText.isBlank()) MaterialTheme.colorScheme.surfaceVariant else TPNavyDark,
-                            contentColor = if (queryText.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else TPMustardYellow
-                        )
-                    ) {
-                        Icon(Lucide.ArrowUp, contentDescription = "提问", modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
+            // v1.3.5: Agent 对话区按 xchange 助手设计重做（独立文件 ObsidianAgentChat.kt）
+            ObsidianAgentChat(
+                state = state,
+                onAskObsidian = onAskObsidian,
+                onStopObsidian = onStopObsidian,
+                onOpenVaultNote = onOpenVaultNote,
+                onCloseVaultNote = onCloseVaultNote,
+                modifier = Modifier.fillMaxWidth().weight(1f)
+            )
         } else {
             // 双链实体与同步笔记列表
             LazyColumn(
