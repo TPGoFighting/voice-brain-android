@@ -1,6 +1,7 @@
 package top.tpgofighting.voicebrain.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -30,6 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -76,24 +80,40 @@ fun LiveWorkbenchTab(
     onBatteryHintHandled: () -> Unit = {}
 ) {
     val listState = rememberLazyListState()
-    var showDeviceMenu by remember { mutableStateOf(false) }
     var showArchive by remember { mutableStateOf(false) }
-    var advancedExpanded by remember { mutableStateOf(false) }
+    var showSourceSheet by remember { mutableStateOf(false) }
+    var showSettingsSheet by remember { mutableStateOf(false) }
 
     // 自动滚动至最新的转写句子
-    LaunchedEffect(state.utterances.size) {
-        if (state.utterances.isNotEmpty()) {
-            listState.animateScrollToItem(state.utterances.size - 1)
+    LaunchedEffect(state.utterances.size, state.interimText) {
+        val lastIndex = state.utterances.size - 1 + if (state.interimText.isNotBlank()) 1 else 0
+        if (lastIndex >= 0) {
+            listState.animateScrollToItem(lastIndex)
         }
+    }
+
+    // 当前实际生效的音源（与旧版同一套判定：录音中取系统路由，否则手动选择，再否则自动优选 DJI > USB）
+    val activeDevice = when {
+        state.isRecording -> state.audioDevices.firstOrNull { it.name == state.activeDeviceLabel }
+        state.selectedDeviceId != null -> state.audioDevices.firstOrNull { it.id == state.selectedDeviceId }
+        else -> state.audioDevices.firstOrNull { it.isDji }
+            ?: state.audioDevices.firstOrNull { it.kind == "usb" }
+    }
+    val externalActive = activeDevice != null && activeDevice.kind != "builtin"
+    val deviceShort = when {
+        activeDevice?.isDji == true -> "领夹麦"
+        externalActive -> "外接麦"
+        else -> "内置麦"
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // 0. 麦克风权限被拒后的恢复卡（系统框拒绝后只剩设置页一条路）
+        // 麦克风权限被拒后的恢复卡（保持原样）
         if (state.micPermissionDenied && !state.isRecording) {
             val context = LocalContext.current
             TPCard(
@@ -101,7 +121,7 @@ fun LiveWorkbenchTab(
                 backgroundColor = MaterialTheme.colorScheme.surface
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -126,349 +146,6 @@ fun LiveWorkbenchTab(
             }
         }
 
-        // 1. 录音主控制面板 (Hero Panel)
-        TPCard(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = MaterialTheme.colorScheme.surface
-        ) {
-            // 状态栏与计时器
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val statusVariant = when {
-                        state.wsStatusConnected -> TPBadgeVariant.GREEN
-                        state.isRecording -> TPBadgeVariant.YELLOW
-                        else -> TPBadgeVariant.DARK
-                    }
-                    // 未开始录音时连接状态没有意义，只显示准备就绪
-                    TPBadge(
-                        text = if (state.isRecording || state.wsStatusConnected) state.wsStatusText else "准备就绪",
-                        variant = statusVariant
-                    )
-                }
-
-                val mins = String.format("%02d", state.recordDurationSeconds / 60)
-                val secs = String.format("%02d", state.recordDurationSeconds % 60)
-                TPBadge(text = "$mins:$secs", variant = TPBadgeVariant.BLUE)
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // 核心录音按钮（按压弹簧缩放反馈）
-            val recordInteraction = remember { MutableInteractionSource() }
-            val recordPressed by recordInteraction.collectIsPressedAsState()
-            val recordScale by animateFloatAsState(
-                targetValue = if (recordPressed) 0.97f else 1f,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                label = "recordScale"
-            )
-            Button(
-                onClick = onToggleRecord,
-                interactionSource = recordInteraction,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .scale(recordScale)
-                    .border(1.5.dp, TPNavyDark, RoundedCornerShape(10.dp)),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (state.isRecording) TPAccentRed else TPMustardYellow,
-                    contentColor = if (state.isRecording) Color.White else TPNavyDark
-                ),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(
-                        imageVector = if (state.isRecording) Icons.Outlined.Stop else Icons.Outlined.Mic,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = if (state.isRecording) "停止并保存" else "开始录音",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // 动态声波可视化（真实音量历史驱动）
-            TPWaveformView(
-                volume = state.currentVolume,
-                isRecording = state.isRecording,
-                barColor = if (state.isRecording) TPMustardYellowDark else Color.LightGray,
-                history = state.volumeHistory
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // 录音音源（DJI Mic Mini 接收器等外接设备）
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.HeadsetMic,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = "音源:",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                // 当前实际生效的音源：录音中取系统路由结果，否则取手动选择，
-                // 再否则取自动优选（DJI 领夹麦 > USB > 内置）
-                val activeDevice = when {
-                    state.isRecording -> state.audioDevices.firstOrNull { it.name == state.activeDeviceLabel }
-                    state.selectedDeviceId != null -> state.audioDevices.firstOrNull { it.id == state.selectedDeviceId }
-                    else -> state.audioDevices.firstOrNull { it.isDji }
-                        ?: state.audioDevices.firstOrNull { it.kind == "usb" }
-                }
-                val externalActive = activeDevice != null && activeDevice.kind != "builtin"
-                Box {
-                    val currentLabel = when {
-                        state.isRecording -> state.activeDeviceLabel
-                        state.selectedDeviceId != null ->
-                            state.audioDevices.firstOrNull { it.id == state.selectedDeviceId }?.name ?: "指定设备"
-                        else -> state.audioDevices.firstOrNull { it.isDji }?.name
-                            ?: state.audioDevices.firstOrNull { it.kind == "usb" }?.name
-                            ?: "自动（内置麦克风）"
-                    }
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (externalActive) TPAccentGreenLight else MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { showDeviceMenu = true }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = currentLabel,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (activeDevice?.isDji == true) TPAccentGreen else MaterialTheme.colorScheme.onSurface
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ArrowDropDown,
-                            contentDescription = "切换音源",
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                    DropdownMenu(expanded = showDeviceMenu, onDismissRequest = { showDeviceMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("自动优选（DJI/USB 优先）", fontSize = 12.sp) },
-                            onClick = { onSelectDevice(null); showDeviceMenu = false },
-                            leadingIcon = { Icon(Icons.Filled.AutoAwesome, null, Modifier.size(16.dp)) }
-                        )
-                        state.audioDevices.forEach { device ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        device.name + if (device.isDji) " · 领夹麦" else "",
-                                        fontSize = 12.sp
-                                    )
-                                },
-                                onClick = { onSelectDevice(device.id); showDeviceMenu = false },
-                                leadingIcon = {
-                                    Icon(
-                                        if (device.kind == "builtin") Icons.Filled.PhoneAndroid else Icons.Filled.Usb,
-                                        null, Modifier.size(16.dp)
-                                    )
-                                }
-                            )
-                        }
-                    }
-                }
-                // 音源状态徽标：正在用领夹麦/外接麦要一眼可见；只是接了没在用则弱提示
-                when {
-                    activeDevice?.isDji == true ->
-                        TPBadge(text = "领夹麦使用中", variant = TPBadgeVariant.GREEN)
-                    externalActive ->
-                        TPBadge(text = "外接麦使用中", variant = TPBadgeVariant.GREEN)
-                    state.audioDevices.any { it.isDji } ->
-                        TPBadge(text = "DJI 已接入", variant = TPBadgeVariant.BLUE)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // 录音设置默认收起：录音前首屏只留开始按钮与音源；录音中/已有
-            // 录音数据时自动展开，也可手动展开（断句、数据量、导出都在里面）
-            val showAdvanced = advancedExpanded || state.isRecording || state.totalFrames > 0 || state.utterances.isNotEmpty()
-            if (!showAdvanced) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { advancedExpanded = true }
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(Icons.Filled.Tune, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("录音设置（断句、导出）", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Icon(Icons.Filled.ExpandMore, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            if (showAdvanced) {
-            // 断句停顿判定 (500ms 紧凑 / 800ms 标准 / 1200ms 从容)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "断句停顿:",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                listOf(
-                    500 to "500ms 紧凑",
-                    800 to "800ms 标准",
-                    1200 to "1200ms 从容"
-                ).forEach { (ms, label) ->
-                    val isSelected = state.sentenceSilenceMs == ms
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .border(
-                                1.dp,
-                                if (isSelected) TPNavyDark else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                                RoundedCornerShape(6.dp)
-                            )
-                            .background(if (isSelected) TPMustardYellow else MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { onSetSilence(ms) }
-                            .padding(vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = label,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                            color = if (isSelected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // PCM 统计与无损导出
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (state.totalBytes > 0) {
-                        val kb = state.totalBytes / 1024f
-                        if (kb < 1024f) "已录 %.1f KB".format(kb) else "已录 %.1f MB".format(kb / 1024f)
-                    } else "尚未录音",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                        .clickable(onClick = onExportWav)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Download,
-                        contentDescription = "导出WAV",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = "导出无损WAV",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
-            }
-            // 后台保活提示：只在首次录音后出现一次，处理过不再打扰；
-            // 配色用警告橙，与品牌黄（主操作/选中态）分工
-            if (!state.batteryExempt && (state.isRecording || state.hasRecordedOnce) && !state.batteryHintHandled) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(TPWarningLight)
-                        .border(1.dp, TPWarning, RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.BatteryAlert,
-                        contentDescription = null,
-                        tint = TPWarning,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "未加入电池白名单，锁屏长录可能被系统杀后台",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TPNavyDark,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "电池豁免",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TPNavyDark,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.White)
-                            .border(1.dp, TPWarning, RoundedCornerShape(6.dp))
-                            .clickable { onBatteryExemption(); onBatteryHintHandled() }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                    Text(
-                        text = "自启动",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TPNavyDark,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.White)
-                            .border(1.dp, TPWarning, RoundedCornerShape(6.dp))
-                            .clickable { onAutoStartSettings(); onBatteryHintHandled() }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                    Text(
-                        text = "知道了",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TPWarningDark,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable { onBatteryHintHandled() }
-                            .padding(horizontal = 6.dp, vertical = 4.dp)
-                    )
-                }
-            }
-        }
-
         // 归档回看横幅
         if (state.viewingSessionTitle != null) {
             Row(
@@ -484,217 +161,375 @@ fun LiveWorkbenchTab(
                 Text(
                     text = "正在回看：${state.viewingSessionTitle}",
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = TPNavyDark,
                     modifier = Modifier.weight(1f)
                 )
             }
         }
 
-        // 2. 转写流面板 (Tier 1 & Tier 2)
-        TPCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            backgroundColor = MaterialTheme.colorScheme.surface
+        // 状态行：左状态点+状态文，右计时；录音中计时升为 40sp 主角（规格 §2.1）
+        Row(
+            modifier = Modifier.fillMaxWidth().animateContentSize(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 头部小标题与操作
+            val dotColor = when {
+                state.isRecording -> TPAccentRed
+                state.wsStatusConnected -> TPAccentGreen
+                else -> Color(0xFF94A3B8)
+            }
+            val dotPulse = rememberInfiniteTransition(label = "statusDot")
+            val dotAlpha by dotPulse.animateFloat(
+                initialValue = 1f, targetValue = 0.35f,
+                animationSpec = infiniteRepeatable(animation = tween(700), repeatMode = RepeatMode.Reverse),
+                label = "statusDotAlpha"
+            )
+            Box(
+                Modifier.size(8.dp).clip(CircleShape)
+                    .background(dotColor.copy(alpha = if (state.isRecording) dotAlpha else 1f))
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = when {
+                    state.isRecording -> "录音中"
+                    state.wsStatusConnected -> state.wsStatusText
+                    else -> "准备就绪"
+                },
+                style = TPType.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(Modifier.weight(1f))
+            val mins = String.format("%02d", state.recordDurationSeconds / 60)
+            val secs = String.format("%02d", state.recordDurationSeconds % 60)
+            Text(
+                text = "$mins:$secs",
+                style = if (state.isRecording) TPType.timer else TPType.timerInline
+            )
+        }
+
+        // 后台保活提示（内容与动作沿用旧版，容器从卡内改为独立横幅）
+        if (!state.batteryExempt && (state.isRecording || state.hasRecordedOnce) && !state.batteryHintHandled) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(TPWarningLight)
+                    .border(1.dp, TPWarning, RoundedCornerShape(8.dp))
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Filled.BatteryAlert, contentDescription = null, tint = TPWarning, modifier = Modifier.size(16.dp))
+                Text(
+                    text = "未加入电池白名单，锁屏长录可能被系统杀后台",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TPNavyDark,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "电池豁免",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TPNavyDark,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.White)
+                        .border(1.dp, TPWarning, RoundedCornerShape(6.dp))
+                        .clickable { onBatteryExemption(); onBatteryHintHandled() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+                Text(
+                    text = "自启动",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TPNavyDark,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.White)
+                        .border(1.dp, TPWarning, RoundedCornerShape(6.dp))
+                        .clickable { onAutoStartSettings(); onBatteryHintHandled() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+                Text(
+                    text = "知道了",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TPWarningDark,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onBatteryHintHandled() }
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        // 波形带：全宽出血，高 48dp
+        TPWaveformView(
+            volume = state.currentVolume,
+            isRecording = state.isRecording,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            barColor = if (state.isRecording) TPMustardYellowDark else Color(0xFFCBD5E1),
+            history = state.volumeHistory
+        )
+
+        if (state.isDiarizing && state.diarizeStatus.isNotBlank()) {
+            Text(
+                text = state.diarizeStatus,
+                fontSize = 11.sp,
+                color = brandAccentColor(),
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        // 转写工具行：仅有内容时出现（规格 §2.1）——左迷你分段，右分离/归档图标钮
+        if (state.utterances.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "实时转写",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "${state.utterances.size} 句",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // 原文 / 清洗稿切换
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                    ) {
-                        listOf(false to "原文", true to "清洗稿").forEach { (cleansed, label) ->
-                            val selected = state.showCleansed == cleansed
-                            Box(
-                                modifier = Modifier
-                                    .background(if (selected) TPMustardYellow else Color.Transparent)
-                                    .clickable { onToggleCleansed(cleansed) }
-                                    .padding(horizontal = 6.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    text = label,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                    color = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                    // 说话人分离
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable(enabled = !state.isDiarizing && !state.isRecording) { onDiarize() }
-                            .padding(horizontal = 6.dp, vertical = 3.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                            if (state.isDiarizing) {
-                                CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 1.5.dp)
-                            } else {
-                                Icon(Icons.Filled.Groups, null, Modifier.size(12.dp))
-                            }
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(TPRadius.sm))
+                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f), RoundedCornerShape(TPRadius.sm))
+                ) {
+                    listOf(false to "原文", true to "清洗稿").forEach { (cleansed, label) ->
+                        val selected = state.showCleansed == cleansed
+                        Box(
+                            modifier = Modifier
+                                .height(28.dp)
+                                .background(if (selected) TPNavyDark else Color.Transparent)
+                                .clickable { onToggleCleansed(cleansed) }
+                                .padding(horizontal = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = if (state.isDiarizing) "分离中" else "说话人分离",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                text = label,
+                                style = TPType.label,
+                                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    // 历史会话
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { onRefreshSessions(); showArchive = true }
-                            .padding(horizontal = 6.dp, vertical = 3.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Icon(Icons.Filled.FolderOpen, null, Modifier.size(12.dp))
-                            Text(text = "归档", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
                 }
-            }
-
-            if (state.isDiarizing && state.diarizeStatus.isNotBlank()) {
-                Text(
-                    text = state.diarizeStatus,
-                    fontSize = 11.sp,
-                    color = brandAccentColor(),
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
-            }
-
-            // Tier 1 感知层打字流 (Raw Stream)
-            AnimatedVisibility(visible = state.interimText.isNotBlank()) {
+                Spacer(Modifier.weight(1f))
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                        .padding(8.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(
-                            imageVector = Icons.Filled.GraphicEq,
-                            contentDescription = null,
-                            tint = TPAccentGreen,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = state.interimText,
-                            fontSize = 12.sp,
-                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Tier 2 固化历史 (Keyed LazyColumn)
-            if (state.utterances.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(TPRadius.sm))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable(enabled = !state.isDiarizing && !state.isRecording) { onDiarize() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // 简笔画线条动画：单色声波线（白色素材按主题染成藏青/品牌黄）。
-                        // 此前的渐变圆环素材会被读成 loading 转圈且与品牌冲突（PM 审查 P1）。
-                        WaveGlyph(
-                            modifier = Modifier.width(148.dp).height(40.dp),
-                            color = brandAccentColor()
-                        )
-                        Text(
-                            text = "静候声音输入...",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "点击上方开始录音；插上 DJI 接收器会自动优选领夹麦",
-                            fontSize = 11.sp,
-                            color = Color.Gray
-                        )
+                    if (state.isDiarizing) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 1.5.dp)
+                    } else {
+                        Icon(Icons.Filled.Groups, contentDescription = "说话人分离", modifier = Modifier.size(17.dp))
                     }
                 }
-            } else {
-                LazyColumn(
-                    state = listState,
+                Spacer(Modifier.width(8.dp))
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    // 转写卡通铺到毛玻璃导航栏之下：末句留 80dp 才能滚出栏面
-                    contentPadding = PaddingValues(bottom = 80.dp)
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(TPRadius.sm))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { onRefreshSessions(); showArchive = true },
+                    contentAlignment = Alignment.Center
                 ) {
-                    items(state.utterances, key = { it.sentenceId }) { u ->
-                        // 新句入场走 animateItem 淡入 + 弹簧位移，不再硬切
-                        Box(Modifier.animateItem()) {
-                            UtteranceItemRow(utterance = u, showCleansed = state.showCleansed)
+                    Icon(Icons.Filled.FolderOpen, contentDescription = "归档", modifier = Modifier.size(17.dp))
+                }
+            }
+        }
+
+        // 转写流：无卡文档流，正文 15sp/24sp；空状态居中
+        if (state.utterances.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    WaveGlyph(
+                        modifier = Modifier.width(148.dp).height(40.dp),
+                        color = brandAccentColor()
+                    )
+                    Text(
+                        text = "静候声音输入...",
+                        style = TPType.body,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "点下方按钮开始录音",
+                        style = TPType.caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
+                items(state.utterances, key = { it.sentenceId }) { u ->
+                    Box(Modifier.animateItem()) {
+                        UtteranceItemRow(utterance = u, showCleansed = state.showCleansed)
+                    }
+                }
+                if (state.interimText.isNotBlank()) {
+                    item {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.GraphicEq,
+                                contentDescription = null,
+                                tint = TPAccentGreen,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = state.interimText,
+                                style = TPType.bodyMain.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
             }
         }
 
-        // 3. 底部快捷操作条：以此人设生成纪要
+        // 生成纪要：内容就绪且未录音时，以文字钮形态出现在坞上方右侧
         if (state.utterances.isNotEmpty() && !state.isRecording) {
-            Button(
-                onClick = onGenerateMinutes,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(42.dp)
-                    .border(1.5.dp, TPNavyDark, RoundedCornerShape(8.dp)),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = TPNavyDark,
-                    contentColor = TPMustardYellow
-                ),
-                shape = RoundedCornerShape(8.dp)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onGenerateMinutes) {
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(15.dp), tint = brandAccentColor())
+                    Spacer(Modifier.width(4.dp))
+                    Text("以此生成结构化纪要", style = TPType.label, color = brandAccentColor())
+                }
+            }
+        }
+
+        // 录音坞：悬浮于底栏上方，左音源 / 中主按钮 / 右设置（规格 §2.1）
+        RecordingDock(
+            isRecording = state.isRecording,
+            deviceShort = deviceShort,
+            externalActive = externalActive,
+            onToggleRecord = onToggleRecord,
+            onOpenSource = { showSourceSheet = true },
+            onOpenSettings = { showSettingsSheet = true }
+        )
+    }
+
+    // 音源选择底部弹层（行高 56dp）
+    if (showSourceSheet) {
+        ModalBottomSheet(onDismissRequest = { showSourceSheet = false }) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(
-                        imageVector = Icons.Filled.AutoAwesome,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                Text("选择音源", style = TPType.sectionTitle)
+                Text(
+                    "插上 DJI 接收器时，自动优选会优先领夹麦。",
+                    style = TPType.caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                SourceRow(
+                    label = "自动优选（DJI/USB 优先）",
+                    selected = state.selectedDeviceId == null,
+                    onClick = { onSelectDevice(null); showSourceSheet = false }
+                )
+                state.audioDevices.forEach { device ->
+                    SourceRow(
+                        label = device.name + if (device.isDji) " · 领夹麦" else "",
+                        selected = state.selectedDeviceId == device.id,
+                        onClick = { onSelectDevice(device.id); showSourceSheet = false }
                     )
-                    Text(
-                        text = "以此生成【${state.currentPersona.name}】结构化纪要",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                }
+            }
+        }
+    }
+
+    // 录音设置底部弹层：断句 / 展示 / 导出（设置页仍是唯一真源，这里是录音现场的快捷面）
+    if (showSettingsSheet) {
+        ModalBottomSheet(onDismissRequest = { showSettingsSheet = false }) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text("录音设置", style = TPType.sectionTitle)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("断句停顿", style = TPType.rowTitle)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(500 to "500ms 紧凑", 800 to "800ms 标准", 1200 to "1200ms 从容").forEach { (ms, label) ->
+                            val selected = state.sentenceSilenceMs == ms
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .clip(RoundedCornerShape(TPRadius.sm))
+                                    .background(if (selected) TPNavyDark else MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { onSetSilence(ms) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = TPType.label,
+                                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("转写展示", style = TPType.rowTitle)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(false to "原文", true to "清洗稿").forEach { (cleansed, label) ->
+                            val selected = state.showCleansed == cleansed
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .clip(RoundedCornerShape(TPRadius.sm))
+                                    .background(if (selected) TPNavyDark else MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { onToggleCleansed(cleansed) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = TPType.label,
+                                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(TPRadius.sm))
+                        .clickable { onExportWav(); showSettingsSheet = false }
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(19.dp))
+                    Column {
+                        Text("导出无损 WAV", style = TPType.rowTitle)
+                        Text(
+                            text = if (state.totalBytes > 0) {
+                                val kb = state.totalBytes / 1024f
+                                if (kb < 1024f) "已录 %.1f KB".format(kb) else "已录 %.1f MB".format(kb / 1024f)
+                            } else "尚未录音",
+                            style = TPType.caption,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -824,58 +659,183 @@ fun UtteranceItemRow(utterance: Utterance, showCleansed: Boolean = false) {
     } else {
         utterance.rawText.ifBlank { utterance.text }
     }
-    Box(
+    // 文档流行：说话人色点 + 名字 + 时间一行，正文 15sp/24sp，无卡无边（规格 §2.1）
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(speakerColor(utterance.speaker))
+            )
+            Text(
+                text = utterance.speaker,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = utterance.time,
+                style = TPType.caption,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.weight(1f))
+            if (utterance.isCleansed) {
+                Text(
+                    text = if (showCleansed) "清洗稿" else "清洗稿已存",
+                    style = TPType.caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Text(
+            text = displayText,
+            style = TPType.bodyMain,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+/** 录音坞左/右列与音源弹层共用的 56dp 选择行 */
+@Composable
+private fun SourceRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .padding(8.dp)
+            .height(56.dp)
+            .clip(RoundedCornerShape(TPRadius.sm))
+            .background(if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TPBadge(text = "#${utterance.id}", variant = TPBadgeVariant.YELLOW)
-                    Text(
-                        text = utterance.time,
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(speakerColor(utterance.speaker))
-                    )
-                    Text(
-                        text = utterance.speaker,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+        Text(text = label, style = TPType.body, modifier = Modifier.weight(1f))
+        if (selected) {
+            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp), tint = brandAccentColor())
+        }
+    }
+}
 
-                if (utterance.isCleansed) {
-                    TPBadge(
-                        text = if (showCleansed) "清洗稿展示中" else "清洗稿已存 · 原文展示",
-                        variant = TPBadgeVariant.GREEN
+/**
+ * 悬浮录音坞（规格 §2.1）：高 80dp、radius-lg 浮层材质；
+ * 左音源列（外接时绿点）、中 64dp 圆形主按钮（待机品牌黄+藏青麦；录音中藏青+白色停止块+黄色脉冲环）、右设置列。
+ */
+@Composable
+private fun RecordingDock(
+    isRecording: Boolean,
+    deviceShort: String,
+    externalActive: Boolean,
+    onToggleRecord: () -> Unit,
+    onOpenSource: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    val darkSurface = MaterialTheme.colorScheme.surface == TPCardDark
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(80.dp)
+            .shadow(8.dp, RoundedCornerShape(TPRadius.lg), clip = false)
+            .background(if (darkSurface) TPNavySurface else Color.White, RoundedCornerShape(TPRadius.lg))
+            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(TPRadius.lg))
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .width(64.dp)
+                .clip(RoundedCornerShape(TPRadius.sm))
+                .clickable { onOpenSource() }
+                .padding(vertical = 6.dp)
+        ) {
+            Box {
+                Icon(
+                    imageVector = Icons.Outlined.HeadsetMic,
+                    contentDescription = "切换音源",
+                    modifier = Modifier.size(22.dp)
+                )
+                if (externalActive) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(TPAccentGreen)
                     )
-                } else {
-                    TPBadge(text = "ASR 定稿", variant = TPBadgeVariant.BLUE)
                 }
             }
+            Spacer(Modifier.height(2.dp))
+            Text(text = deviceShort, style = TPType.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
 
-            Text(
-                text = displayText,
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
+        Spacer(Modifier.weight(1f))
+
+        Box(contentAlignment = Alignment.Center) {
+            if (isRecording) {
+                val pulseTransition = rememberInfiniteTransition(label = "dockPulse")
+                val pulseScale by pulseTransition.animateFloat(
+                    initialValue = 1f, targetValue = 1.38f,
+                    animationSpec = infiniteRepeatable(animation = tween(1200), repeatMode = RepeatMode.Restart),
+                    label = "dockPulseScale"
+                )
+                val pulseAlpha by pulseTransition.animateFloat(
+                    initialValue = 0.55f, targetValue = 0f,
+                    animationSpec = infiniteRepeatable(animation = tween(1200), repeatMode = RepeatMode.Restart),
+                    label = "dockPulseAlpha"
+                )
+                Box(
+                    Modifier
+                        .size(64.dp)
+                        .scale(pulseScale)
+                        .border(2.dp, TPMustardYellow.copy(alpha = pulseAlpha), CircleShape)
+                )
+            }
+            val interaction = remember { MutableInteractionSource() }
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .pressScale(interaction, 0.94f)
+                    .clip(CircleShape)
+                    .background(if (isRecording) TPNavyDark else TPMustardYellow)
+                    .border(1.5.dp, TPNavyDark, CircleShape)
+                    .clickable(interactionSource = interaction, indication = null) { onToggleRecord() }
+                    .semantics { contentDescription = if (isRecording) "停止录音" else "开始录音" },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isRecording) {
+                    Box(Modifier.size(20.dp).background(Color.White, RoundedCornerShape(4.dp)))
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Mic,
+                        contentDescription = null,
+                        modifier = Modifier.size(26.dp),
+                        tint = TPNavyDark
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .width(64.dp)
+                .clip(RoundedCornerShape(TPRadius.sm))
+                .clickable { onOpenSettings() }
+                .padding(vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MoreHoriz,
+                contentDescription = "录音设置",
+                modifier = Modifier.size(22.dp)
             )
+            Spacer(Modifier.height(2.dp))
+            Text(text = "设置", style = TPType.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
