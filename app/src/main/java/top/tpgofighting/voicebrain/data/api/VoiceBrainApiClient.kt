@@ -39,6 +39,14 @@ class VoiceBrainApiClient(
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    // 长耗时请求专用：Obsidian Agent 问答与纪要生成在服务端可达 90~120s，
+    // 默认 60s 读超时会在答案返回前先断开，误报「网络异常」
+    private val longClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(150, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
+
     // 流式问答专用：读超时放宽，逐行消费 SSE
     private val streamClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -86,7 +94,7 @@ class VoiceBrainApiClient(
                 .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = longClient.newCall(request).execute()
             val respBody = response.body?.string() ?: ""
             if (!response.isSuccessful) {
                 return@withContext Result.failure(Exception("HTTP ${response.code}: $respBody"))
@@ -505,7 +513,7 @@ class VoiceBrainApiClient(
                 .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = longClient.newCall(request).execute()
             val respBody = response.body?.string() ?: ""
             if (!response.isSuccessful) {
                 return@withContext Result.failure(Exception("HTTP ${response.code}: $respBody"))

@@ -26,7 +26,7 @@ class AsrWebSocketManager(
 ) {
     companion object {
         private const val TAG = "AsrWebSocketManager"
-        private const val MAX_BUFFER_CHUNKS = 150 // 15 seconds ring buffer
+        private const val MAX_BUFFER_CHUNKS = 600 // 60 seconds ring buffer
     }
 
     private val client = OkHttpClient.Builder()
@@ -35,6 +35,12 @@ class AsrWebSocketManager(
         .build()
 
     private var webSocket: WebSocket? = null
+
+    // stable session id for this recording: sent on every (re)connect so the server resumes the same session
+    private var sessionId: String = ""
+
+    // reconnect backoff counter (0.5s -> 1s -> 2s -> 4s cap), reset on open
+    private var reconnectAttempts = 0
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var pingJob: Job? = null
 
@@ -51,6 +57,8 @@ class AsrWebSocketManager(
 
     fun start() {
         isRecording = true
+        sessionId = "sess-android-" + System.currentTimeMillis() + "-" + (1000..9999).random()
+        reconnectAttempts = 0
         connect()
         startPingTimer()
     }
@@ -68,7 +76,8 @@ class AsrWebSocketManager(
             override fun onOpen(ws: WebSocket, response: Response) {
                 Log.i(TAG, "WebSocket connected to $serverUrl")
                 isConnected = true
-                ws.send("""{"type":"start","maxSentenceSilence":$sentenceSilenceMs}""")
+                reconnectAttempts = 0
+                ws.send("""{"type":"start","sessionId":"$sessionId","maxSentenceSilence":$sentenceSilenceMs}""")
 
                 // 冲刷缓冲的 PCM 队列
                 flushBuffer()
@@ -192,8 +201,15 @@ class AsrWebSocketManager(
     }
 
     private fun scheduleReconnect() {
+        val delayMs = when (reconnectAttempts) {
+            0 -> 500L
+            1 -> 1000L
+            2 -> 2000L
+            else -> 4000L
+        }
+        reconnectAttempts++
         coroutineScope.launch {
-            delay(500)
+            delay(delayMs)
             if (isRecording && !isConnected) {
                 connect()
             }
