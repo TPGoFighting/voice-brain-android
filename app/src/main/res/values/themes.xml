@@ -3,4 +3,12 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <!-- 启动屏（规格 §2.7）：奶油纸底 + 白色圆磁贴线稿 Logo，不放文案与进度 -->
+    <style name="Theme.TPVoiceBrain.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+        <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="postSplashScreenTheme">@style/Theme.TPVoiceBrain</item>
+    </style>
 </resources>

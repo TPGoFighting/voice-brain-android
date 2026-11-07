@@ -238,12 +238,12 @@ fun MainScreen(
                     // 方向感知的共享轴：新页从滑动方向一侧以 1/4 屏宽滑入并微微放大，旧页反向滑出淡出
                     val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
                     val springSpec = androidx.compose.animation.core.spring<Float>(
-                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                        dampingRatio = 1.0f,
+                        stiffness = 400f
                     )
                     val slideSpring = androidx.compose.animation.core.spring<IntOffset>(
-                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                        dampingRatio = 1.0f,
+                        stiffness = 400f
                     )
                     androidx.compose.animation.ContentTransform(
                         androidx.compose.animation.fadeIn(animationSpec = springSpec) +

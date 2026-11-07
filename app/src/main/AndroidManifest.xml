@@ -23,6 +23,7 @@
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
+            android:theme="@style/Theme.TPVoiceBrain.Splash"
             android:exported="true"
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"

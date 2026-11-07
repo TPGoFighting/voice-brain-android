@@ -11,6 +11,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import android.os.SystemClock
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -58,6 +60,14 @@ class MainActivity : ComponentActivity() {
     ) { /* 结果不阻断功能：无通知权限时前台服务照常运行，仅通知不进通知栏 */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 启动屏（规格 §2.7）：保持到首批状态（会话列表或 Vault 状态）就绪，硬顶 800ms，不造假停留
+        val splashStartMs = SystemClock.uptimeMillis()
+        val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition {
+            val s = viewModel.uiState.value
+            (s.isLoadingSessions || !s.obsidianStatus.loaded) &&
+                SystemClock.uptimeMillis() - splashStartMs < 800
+        }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 

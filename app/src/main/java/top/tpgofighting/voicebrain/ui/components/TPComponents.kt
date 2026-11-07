@@ -302,8 +302,8 @@ fun Modifier.pressScale(
     val scale by animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            dampingRatio = 0.55f,
+            stiffness = 900f
         ),
         label = "pressScale"
     )
