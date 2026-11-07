@@ -1,5 +1,6 @@
 package top.tpgofighting.voicebrain.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -28,6 +29,7 @@ import top.tpgofighting.voicebrain.model.MemoryItem
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Brain
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Search
 import com.mikepenz.markdown.m3.Markdown
 import top.tpgofighting.voicebrain.ui.components.*
 import top.tpgofighting.voicebrain.ui.theme.*
@@ -121,16 +123,32 @@ fun MemoryBrainTab(
 
         // 2. 子面板 A: 记忆资产库列表
         if (state.memorySubTab == 0) {
-            // 搜索框
-            OutlinedTextField(
-                value = state.memorySearchQuery,
-                onValueChange = onSetSearchQuery,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                placeholder = { Text("只在记忆里筛选，如：决策、承诺...", fontSize = 11.sp) },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                shape = RoundedCornerShape(8.dp),
-                singleLine = true
-            )
+            // 筛选框收进搜索开关（规格 §2.3）：默认不占版面，点搜索钮展开，就地筛选不跳页
+            var showMemoryFilter by remember { mutableStateOf(false) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                IconButton(onClick = { showMemoryFilter = !showMemoryFilter }) {
+                    Icon(
+                        Lucide.Search,
+                        contentDescription = "筛选记忆",
+                        modifier = Modifier.size(19.dp),
+                        tint = if (showMemoryFilter) brandAccentColor() else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            AnimatedVisibility(visible = showMemoryFilter) {
+                OutlinedTextField(
+                    value = state.memorySearchQuery,
+                    onValueChange = onSetSearchQuery,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    placeholder = { Text("只在记忆里筛选，如：决策、承诺...", fontSize = 11.sp) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    shape = RoundedCornerShape(TPRadius.md),
+                    singleLine = true
+                )
+            }
 
             // 分类筛选 Chip 滚动条
             val categories = listOf("全部", "偏好画像", "项目方案", "重大决策", "人物承诺", "客观经验")

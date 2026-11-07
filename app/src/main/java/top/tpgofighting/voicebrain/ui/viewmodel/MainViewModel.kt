@@ -153,7 +153,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     BrainChatMessage(
                         id = "oc-0",
                         isUser = false,
-                        content = "这里查的是你的 Obsidian 仓库笔记正文：概念、人物、项目都可以直接问，回答会标注来源笔记。录音里说过的内容不在这里查，去「记忆大脑」页问。开启下方的反向追记后，回答可以追加写回指定笔记。",
+                        content = "这里查的是你的 Obsidian 仓库笔记正文：概念、人物、项目都可以直接问，回答会标注来源笔记。录音里说过的内容不在这里查，去「记忆大脑」页问。开启反向追记后，回答可以追加写回指定笔记。",
                         timestamp = "刚刚"
                     )
                 )
