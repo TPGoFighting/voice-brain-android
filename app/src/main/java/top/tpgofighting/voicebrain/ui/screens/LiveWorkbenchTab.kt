@@ -110,7 +110,7 @@ fun LiveWorkbenchTab(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp)
-            .padding(top = 8.dp, bottom = 88.dp),
+            .padding(top = 8.dp, bottom = 118.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // 麦克风权限被拒后的恢复卡（保持原样）

@@ -129,10 +129,45 @@ fun MainScreen(
                     }
                 },
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        TPLogoTile(size = 30.dp)
-                        Text("Voice Brain", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        TPBadge(text = uiState.currentPersona.badge, variant = TPBadgeVariant.YELLOW)
+                    // 顶栏标题化（规格 §2.6 + 决策 A）：撤人设徽章与 Logo 瓷砖（品牌头只活在抽屉与启动屏），
+                    // 显示当前页名 + 一行动态副标题（真实状态，不写静态口号）
+                    val pageTitle = when (currentTab) {
+                        NavigationTab.LIVE -> "实时录音"
+                        NavigationTab.MINUTES -> "纪要"
+                        NavigationTab.MEMORY -> "记忆大脑"
+                        NavigationTab.OBSIDIAN -> "Obsidian"
+                    }
+                    val pageSubtitle = when (currentTab) {
+                        NavigationTab.LIVE -> if (uiState.isRecording) {
+                            "录音中 · %02d:%02d".format(uiState.recordDurationSeconds / 60, uiState.recordDurationSeconds % 60)
+                        } else "就绪"
+                        NavigationTab.MINUTES -> uiState.currentPersona.name
+                        NavigationTab.MEMORY -> "${uiState.memories.size} 条记忆 · ${uiState.sessions.size} 次会话"
+                        NavigationTab.OBSIDIAN -> when {
+                            !uiState.obsidianStatus.loaded -> "状态确认中"
+                            uiState.obsidianStatus.connected -> "已连接 · ${uiState.obsidianStatus.totalNotes} 笔记"
+                            else -> "未连接"
+                        }
+                    }
+                    Column {
+                        Text(pageTitle, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            pageSubtitle,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                actions = {
+                    // 右端只放当前页唯一的页面级动作（规格 §2.6）
+                    when (currentTab) {
+                        NavigationTab.LIVE -> IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Lucide.History, contentDescription = "历史会话", modifier = Modifier.size(20.dp))
+                        }
+                        NavigationTab.OBSIDIAN -> IconButton(onClick = { viewModel.refreshObsidianStatus() }) {
+                            Icon(Lucide.RefreshCw, contentDescription = "刷新状态", modifier = Modifier.size(19.dp))
+                        }
+                        else -> {}
                     }
                 },
                 // 顶栏不再放「N 条记忆」计数：与记忆页的计数重复，属于噪音
@@ -316,7 +351,7 @@ private fun AppDrawerSheet(
     ModalDrawerSheet(
         modifier = Modifier.width(300.dp),
         drawerContainerColor = MaterialTheme.colorScheme.surface,
-        drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
+        drawerShape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp)
     ) {
         Column(
             modifier = Modifier
@@ -347,7 +382,7 @@ private fun AppDrawerSheet(
                             .fillMaxWidth()
                             .heightIn(min = 52.dp)
                             .background(
-                                if (selected) TPMustardYellow else Color.Transparent,
+                                if (selected) TPMustardYellow.copy(alpha = 0.18f) else Color.Transparent,
                                 RoundedCornerShape(10.dp)
                             )
                             .clickable { onSelectTab(tab) }
@@ -355,6 +390,16 @@ private fun AppDrawerSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // 选中指示条：浅黄填充 + 左侧 3dp 黄条（决策 G，与底栏实心黄药丸区别对待）
+                        Box(
+                            Modifier
+                                .width(3.dp)
+                                .height(20.dp)
+                                .background(
+                                    if (selected) TPMustardYellow else Color.Transparent,
+                                    RoundedCornerShape(999.dp)
+                                )
+                        )
                         Icon(
                             tab.icon,
                             contentDescription = null,

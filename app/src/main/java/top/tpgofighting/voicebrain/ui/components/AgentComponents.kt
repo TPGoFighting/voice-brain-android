@@ -129,7 +129,7 @@ fun AgentStreamingText(
             Text(
                 text = "▍",
                 fontSize = 13.sp,
-                color = TPAccentBlue.copy(alpha = alpha)
+                color = TPMustardYellowDark.copy(alpha = alpha)
             )
         }
     }
@@ -219,14 +219,14 @@ fun AgentSourceRow(
                 Lucide.Link2,
                 contentDescription = null,
                 modifier = Modifier.size(13.dp).padding(top = 1.dp),
-                tint = TPAccentBlue
+                tint = brandAccentColor()
             )
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     text = title.ifBlank { "历史录音" },
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TPAccentBlue
+                    color = brandAccentColor()
                 )
                 Text(
                     text = "「${quote.take(80)}」",

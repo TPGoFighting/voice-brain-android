@@ -154,24 +154,18 @@ fun MemoryBrainTab(
                     val isSelected = state.selectedMemoryCategory == cat
                     Box(
                         modifier = Modifier
-                            .border(
-                                1.dp,
-                                if (isSelected) TPMustardYellowDark else MaterialTheme.colorScheme.outline,
-                                RoundedCornerShape(16.dp)
-                            )
                             .background(
-                                if (isSelected) TPMustardYellow else MaterialTheme.colorScheme.surface,
-                                RoundedCornerShape(16.dp)
+                                if (isSelected) TPNavyDark else MaterialTheme.colorScheme.surfaceVariant,
+                                RoundedCornerShape(TPRadius.sm)
                             )
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(TPRadius.sm))
                             .clickable { onSetCategory(cat) }
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = cat,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                            color = if (isSelected) TPNavyDark else MaterialTheme.colorScheme.onSurface
+                            style = TPType.label,
+                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -196,7 +190,7 @@ fun MemoryBrainTab(
 
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
                 // 内容通铺到悬浮毛玻璃导航栏之下：末项留 96dp 才能滚出栏面
                 contentPadding = PaddingValues(bottom = 96.dp)
             ) {
@@ -321,7 +315,7 @@ fun MemoryBrainTab(
                         onValueChange = { inputQuery = it },
                         modifier = Modifier.weight(1f).height(52.dp),
                         placeholder = { Text("问录音和记忆里的事，如：限流方案定了吗", fontSize = 11.sp) },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(TPRadius.md),
                         singleLine = true
                     )
 
@@ -426,7 +420,7 @@ fun MemoryBrainTab(
                                     Text(
                                         text = "点按在工作台打开这段录音",
                                         fontSize = 11.sp,
-                                        color = TPAccentBlue,
+                                        color = brandAccentColor(),
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -441,7 +435,8 @@ fun MemoryBrainTab(
 
 @Composable
 fun MemoryCardItem(item: MemoryItem) {
-    TPCard(modifier = Modifier.fillMaxWidth()) {
+    // 文档行（规格 §2.3）：分类徽章 + 时间一行、正文 13/19、可点来源行（无来源数据时不编造），行间 hairline
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -454,8 +449,16 @@ fun MemoryCardItem(item: MemoryItem) {
                 "person" -> Pair("人物承诺", TPBadgeVariant.PURPLE)
                 else -> Pair("客观经验", TPBadgeVariant.DARK)
             }
-            TPBadge(text = badgeText, variant = badgeVariant)
-
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TPBadge(text = badgeText, variant = badgeVariant)
+                if (item.createdAt.isNotBlank()) {
+                    Text(
+                        text = item.createdAt.take(16).replace("T", " "),
+                        style = TPType.caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                 repeat(item.importance) {
                     Icon(Icons.Filled.Star, contentDescription = null, tint = TPMustardYellowDark, modifier = Modifier.size(12.dp))
@@ -463,12 +466,10 @@ fun MemoryCardItem(item: MemoryItem) {
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = item.content,
-            fontSize = 12.sp,
-            lineHeight = 18.sp,
-            fontWeight = FontWeight.Medium,
+            style = TPType.bodySmall,
             color = MaterialTheme.colorScheme.onSurface
         )
 
@@ -481,12 +482,13 @@ fun MemoryCardItem(item: MemoryItem) {
                             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
                             .padding(horizontal = 4.dp, vertical = 2.dp)
                     ) {
-                        Text("#$tag", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("#$tag", style = TPType.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
         }
     }
+    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 }
 
 @Composable
@@ -515,7 +517,7 @@ fun ChatBubbleRow(
                 }
                 Text(
                     msg.timestamp,
-                    fontSize = 8.sp,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp, end = 4.dp)
                 )
@@ -534,7 +536,7 @@ fun ChatBubbleRow(
         ) {
             Icon(Lucide.Brain, contentDescription = null, modifier = Modifier.size(14.dp), tint = brandAccentColor())
             Text(agentName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
-            Text(msg.timestamp, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(msg.timestamp, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(modifier = Modifier.height(4.dp))
         AgentAppear(appearKey = msg.id) {

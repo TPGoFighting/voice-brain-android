@@ -6,6 +6,8 @@ import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +24,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.Square
 import top.tpgofighting.voicebrain.model.ActionItem
 import top.tpgofighting.voicebrain.model.Persona
 import com.mikepenz.markdown.m3.Markdown
@@ -50,148 +54,109 @@ fun MinutesTab(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // 1. Koboyo 人设胶囊卡片
-        TPCard(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = MaterialTheme.colorScheme.surface
+        // 1. 人设行：一行收完（规格 §2.2）——头像 32 + 名称 + 等级 caption + 切换文字钮；
+        // 签名引言撤出卡面，只在人设选择弹层里展示
+        Row(
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(TPRadius.sm))
+                    .background(TPMustardYellow)
+                    .border(1.5.dp, TPNavyDark, RoundedCornerShape(TPRadius.sm)),
+                contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(TPMustardYellow)
-                            .border(1.5.dp, TPNavyDark, RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Psychology,
-                            contentDescription = null,
-                            tint = TPNavyDark,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                text = state.currentPersona.name,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            TPBadge(text = state.currentPersona.badge, variant = TPBadgeVariant.YELLOW)
-                        }
-                        Text(
-                            text = state.currentPersona.title,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    OutlinedButton(
-                        onClick = { showPersonaBottomSheet = true },
-                        modifier = Modifier.height(36.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                        // 主题 primary 是品牌黄，默认描边按钮文字会跟着变黄、在浅底上几乎看不清，显式指定为正文色
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                        contentPadding = PaddingValues(horizontal = 8.dp)
-                    ) {
-                        Text("切换人设", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    val generateInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-                    Button(
-                        onClick = onGenerateMinutes,
-                        // 无逐字稿时置灰：点了必然空转（PM 审查 P1），改为由空状态引导去录音
-                        enabled = !state.isGeneratingMinutes && (state.minutes != null || state.utterances.isNotEmpty()),
-                        interactionSource = generateInteraction,
-                        modifier = Modifier.height(36.dp).pressScale(generateInteraction),
-                        shape = RoundedCornerShape(6.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark),
-                        contentPadding = PaddingValues(horizontal = 8.dp)
-                    ) {
-                        if (state.isGeneratingMinutes) {
-                            CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp, color = TPNavyDark)
-                        } else {
-                            Text(if (state.minutes == null) "生成纪要" else "重新生成", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
+                Icon(
+                    imageVector = Icons.Filled.Psychology,
+                    contentDescription = null,
+                    tint = TPNavyDark,
+                    modifier = Modifier.size(19.dp)
+                )
             }
-
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "“${state.currentPersona.quote}”",
-                fontSize = 11.sp,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-            // 纪要场景模板（与服务端 MINUTES_TEMPLATES 对齐：通用/会议/课程/访谈）
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "模板:",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
+                    text = state.currentPersona.name,
+                    style = TPType.rowTitle,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = state.currentPersona.badge,
+                    style = TPType.caption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            TextButton(onClick = { showPersonaBottomSheet = true }) {
+                Text("切换人设", style = TPType.label, color = brandAccentColor())
+            }
+        }
+
+        // 模板横滑行 + 生成按钮同行贴右（规格 §2.2）；已生成纪要时主按钮仍为「重新生成」（决策 E）
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 top.tpgofighting.voicebrain.model.MINUTES_TEMPLATES.forEach { tpl ->
                     val isSelected = state.minutesTemplate == tpl.id
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .border(
-                                1.dp,
-                                if (isSelected) TPNavyDark else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                                RoundedCornerShape(6.dp)
-                            )
-                            .background(if (isSelected) TPMustardYellow else MaterialTheme.colorScheme.surfaceVariant)
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(TPRadius.sm))
+                            .background(if (isSelected) TPNavyDark else MaterialTheme.colorScheme.surfaceVariant)
                             .clickable { onSetTemplate(tpl.id) }
-                            .padding(vertical = 4.dp),
+                            .padding(horizontal = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = tpl.label,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                            color = if (isSelected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
+                            style = TPType.label,
+                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
             }
-            val currentTpl = top.tpgofighting.voicebrain.model.MINUTES_TEMPLATES
-                .firstOrNull { it.id == state.minutesTemplate }
-            if (currentTpl != null) {
-                Text(
-                    text = currentTpl.hint,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 3.dp)
-                )
+            val generateInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            Button(
+                onClick = onGenerateMinutes,
+                enabled = !state.isGeneratingMinutes && (state.minutes != null || state.utterances.isNotEmpty()),
+                interactionSource = generateInteraction,
+                modifier = Modifier.height(36.dp).pressScale(generateInteraction),
+                shape = RoundedCornerShape(TPRadius.sm),
+                colors = ButtonDefaults.buttonColors(containerColor = TPMustardYellow, contentColor = TPNavyDark),
+                contentPadding = PaddingValues(horizontal = 14.dp)
+            ) {
+                if (state.isGeneratingMinutes) {
+                    CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp, color = TPNavyDark)
+                } else {
+                    Text(if (state.minutes == null) "生成纪要" else "重新生成", style = TPType.label, fontWeight = FontWeight.SemiBold)
+                }
             }
+        }
+        val currentTpl = top.tpgofighting.voicebrain.model.MINUTES_TEMPLATES
+            .firstOrNull { it.id == state.minutesTemplate }
+        if (currentTpl != null) {
+            Text(
+                text = currentTpl.hint,
+                style = TPType.caption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         // 2. 双视图切换器 (结构化纪要 VS 排版润色正式稿)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(TPRadius.md))
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(TPRadius.md))
                 .padding(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -205,7 +170,7 @@ fun MinutesTab(
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
-                Text("纪要与决策", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("纪要与决策", style = TPType.label)
             }
 
             Button(
@@ -218,23 +183,22 @@ fun MinutesTab(
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
-                Text("正式成稿", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("正式成稿", style = TPType.label)
             }
         }
 
         // 3. 内容展示区 (根据双视图呈现)
         if (state.isMinutesPolishView) {
             // 排版润色视图
-            TPCard(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                backgroundColor = MaterialTheme.colorScheme.surface
+            Column(
+                modifier = Modifier.fillMaxWidth().weight(1f)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("正式汇报草稿 (Markdown 深度解析)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("正式成稿", style = TPType.sectionTitle)
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         IconButton(
                             onClick = onPolishDraft,
@@ -325,7 +289,7 @@ fun MinutesTab(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
                     contentPadding = PaddingValues(bottom = 96.dp)
                 ) {
                     // 纪要标题与模板标识
@@ -348,14 +312,14 @@ fun MinutesTab(
                         }
                     }
 
-                    // 30s TL;DR
+                    // 30 秒速览（文档面分节，不再用卡片堆叠：规格 §2.2）
                     item {
-                        TPCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Filled.ElectricBolt, contentDescription = null, tint = TPMustardYellowDark, modifier = Modifier.size(18.dp))
-                                Text("30秒高管速览 (TL;DR)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Icon(Icons.Filled.ElectricBolt, contentDescription = null, tint = TPMustardYellowDark, modifier = Modifier.size(17.dp))
+                                Text("30 秒速览", style = TPType.sectionTitle)
                             }
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             val items = minutes?.tldr ?: emptyList()
                             if (items.isEmpty()) {
                                 Text("尚未生成纪要，点上方「生成纪要」", fontSize = 11.sp, color = Color.Gray)
@@ -363,20 +327,22 @@ fun MinutesTab(
                             items.forEach { t ->
                                 Row(modifier = Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {
                                     Text("•", fontWeight = FontWeight.Bold, color = TPMustardYellowDark, modifier = Modifier.padding(end = 6.dp))
-                                    Text(t, fontSize = 12.sp, lineHeight = 18.sp)
+                                    Text(t, style = TPType.body)
                                 }
                             }
                         }
                     }
 
-                    // 核心敲定决策
+                    // 关键决议
                     item {
-                        TPCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                            Spacer(modifier = Modifier.height(16.dp))
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Filled.Verified, contentDescription = null, tint = brandAccentColor(), modifier = Modifier.size(18.dp))
-                                Text("明确敲定的关键决议 (Decisions)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Icon(Icons.Filled.Verified, contentDescription = null, tint = brandAccentColor(), modifier = Modifier.size(17.dp))
+                                Text("关键决议", style = TPType.sectionTitle)
                             }
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             val decs = minutes?.decisions ?: emptyList()
                             if (decs.isEmpty() && minutes != null) {
                                 Text("本次纪要未提炼出明确决议", fontSize = 11.sp, color = Color.Gray)
@@ -385,20 +351,22 @@ fun MinutesTab(
                                 Row(modifier = Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.Top) {
                                     TPBadge(text = "${idx + 1}", variant = TPBadgeVariant.BLUE)
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text(d, fontSize = 12.sp, fontWeight = FontWeight.Medium, lineHeight = 18.sp)
+                                    Text(d, style = TPType.body, fontWeight = FontWeight.Medium)
                                 }
                             }
                         }
                     }
 
-                    // 落地行动清单
+                    // 行动项
                     item {
-                        TPCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                            Spacer(modifier = Modifier.height(16.dp))
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Filled.Checklist, contentDescription = null, tint = TPAccentGreen, modifier = Modifier.size(18.dp))
-                                Text("落地行动项 (Action Items)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Icon(Icons.Filled.Checklist, contentDescription = null, tint = TPAccentGreen, modifier = Modifier.size(17.dp))
+                                Text("行动项", style = TPType.sectionTitle)
                             }
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             val todos = minutes?.actionItems ?: emptyList()
                             if (todos.isEmpty() && minutes != null) {
                                 Text("本次纪要未提炼出行动项", fontSize = 11.sp, color = Color.Gray)
@@ -407,15 +375,19 @@ fun MinutesTab(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 3.dp)
-                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                                        .padding(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                        .padding(vertical = 5.dp),
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
+                                    Icon(
+                                        imageVector = if (todo.status.contains("完成") || todo.status.contains("done", ignoreCase = true)) Lucide.Check else Lucide.Square,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(15.dp).padding(top = 1.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(todo.task, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                                        Text("负责: ${todo.assignee} · 优先级: ${todo.priority}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(todo.task, style = TPType.body, fontWeight = FontWeight.Medium)
+                                        Text("负责: ${todo.assignee} · 优先级: ${todo.priority}", style = TPType.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     TPBadge(text = todo.status, variant = TPBadgeVariant.PURPLE)
                                 }
@@ -491,6 +463,14 @@ fun MinutesTab(
                                 }
                                 Text(p.title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
                                 Text(p.description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (p.quote.isNotBlank()) {
+                                    Text(
+                                        "\u201C${p.quote}\u201D",
+                                        fontSize = 11.sp,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }

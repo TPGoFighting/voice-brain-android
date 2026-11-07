@@ -52,92 +52,75 @@ fun ObsidianWikiTab(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // 1. Obsidian Vault 状态看板
-        TPCard(
+        // 1. 页眉：标题行 + 状态一行化（规格 §2.5，真实数据；未知就写未知，不伪装）
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            backgroundColor = MaterialTheme.colorScheme.surface
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Lucide.Network, contentDescription = null, tint = brandAccentColor(), modifier = Modifier.size(18.dp))
-                    Text("Obsidian Vault", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                }
-                TPBadge(
-                    text = when {
-                        !state.obsidianStatus.loaded -> "状态未知"
-                        state.obsidianStatus.connected -> "Vault 已挂载"
-                        else -> "未连接"
-                    },
-                    variant = if (state.obsidianStatus.loaded && state.obsidianStatus.connected) TPBadgeVariant.GREEN else TPBadgeVariant.DARK
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Lucide.Network, contentDescription = null, tint = brandAccentColor(), modifier = Modifier.size(18.dp))
+                Text("Obsidian Vault", style = TPType.rowTitle)
+            }
+            TPBadge(
+                text = when {
+                    !state.obsidianStatus.loaded -> "状态未知"
+                    state.obsidianStatus.connected -> "已挂载"
+                    else -> "未连接"
+                },
+                variant = if (state.obsidianStatus.loaded && state.obsidianStatus.connected) TPBadgeVariant.GREEN else TPBadgeVariant.DARK
+            )
+        }
+        // 状态一行：笔记 · 录音归档 · Wiki 节点（节点数 = 实体列表长度，真实计数）
+        val pathVisible = showVaultPath && state.obsidianStatus.vaultPath.isNotBlank()
+        Text(
+            text = when {
+                pathVisible -> state.obsidianStatus.vaultPath
+                !state.obsidianStatus.loaded -> "状态确认中，点此重试"
+                state.obsidianStatus.connected -> "笔记 ${"%,d".format(state.obsidianStatus.totalNotes)} · 录音归档 ${state.obsidianStatus.syncedVoiceNotes} · Wiki 节点 ${state.obsidianEntities.size}"
+                else -> "未连接，点此重试"
+            },
+            style = TPType.caption,
+            fontFamily = if (pathVisible) FontFamily.Monospace else FontFamily.Default,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.clickable(
+                enabled = state.obsidianStatus.loaded && state.obsidianStatus.vaultPath.isNotBlank()
+            ) { showVaultPath = !showVaultPath }
+        )
+        if (!state.obsidianStatus.loaded || !state.obsidianStatus.connected) {
+            Text(
+                text = "点状态行或右上角刷新重试",
+                style = TPType.caption,
+                color = brandAccentColor(),
+                modifier = Modifier.clickable { onRefreshObsidianStatus() }
+            )
+        }
+
+        // Hermes 反向追记：独立开关行（标签 + 说明在左，开关在右）
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Hermes 反向追记", style = TPType.rowTitle)
+                Text(
+                    "开启后，回答会追加写回笔记末尾",
+                    style = TPType.caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            // 默认只说人话；服务器绝对路径是部署细节，点按这一行才展开查看
-            val pathVisible = showVaultPath && state.obsidianStatus.vaultPath.isNotBlank()
-            Text(
-                text = if (pathVisible) state.obsidianStatus.vaultPath else when {
-                    !state.obsidianStatus.loaded -> "我的 Obsidian 仓库 · 状态确认中"
-                    state.obsidianStatus.connected -> "我的 Obsidian 仓库 · 与服务器实时同步"
-                    else -> "我的 Obsidian 仓库 · 未连接"
-                },
-                fontSize = if (pathVisible) 9.sp else 10.sp,
-                fontFamily = if (pathVisible) FontFamily.Monospace else FontFamily.Default,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.clickable(
-                    enabled = state.obsidianStatus.loaded && state.obsidianStatus.vaultPath.isNotBlank()
-                ) { showVaultPath = !showVaultPath }
+            Switch(
+                checked = state.autoWriteBackEnabled,
+                onCheckedChange = { onToggleAutoWriteBack() }
             )
-
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (state.obsidianStatus.loaded) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("笔记总数: ${state.obsidianStatus.totalNotes}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("·", fontSize = 11.sp)
-                        Text("录音归档: ${state.obsidianStatus.syncedVoiceNotes}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            "点此重试",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = brandAccentColor(),
-                            modifier = Modifier.clickable { onRefreshObsidianStatus() }
-                        )
-                    }
-                }
-
-                // Hermes 反向追记开关
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text("Hermes 反向追记", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Switch(
-                        checked = state.autoWriteBackEnabled,
-                        onCheckedChange = { onToggleAutoWriteBack() },
-                        modifier = Modifier.height(24.dp)
-                    )
-                }
-            }
         }
 
         // 2. 移动端次级分栏 (Hermes 问答 VS 知识实体与笔记)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(TPRadius.md))
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(TPRadius.md))
                 .padding(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -151,7 +134,7 @@ fun ObsidianWikiTab(
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
-                Text("Hermes Agent 问答", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("Hermes Agent 问答", style = TPType.label)
             }
 
             Button(
@@ -164,7 +147,7 @@ fun ObsidianWikiTab(
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {
-                Text("双链实体与同步笔记", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("双链实体与同步笔记", style = TPType.label)
             }
         }
 
@@ -237,7 +220,7 @@ fun ObsidianWikiTab(
                         onValueChange = { queryText = it },
                         modifier = Modifier.weight(1f).height(52.dp),
                         placeholder = { Text("查仓库笔记，如：点云论文笔记在哪", fontSize = 11.sp) },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(TPRadius.md),
                         singleLine = true
                     )
 
@@ -270,43 +253,47 @@ fun ObsidianWikiTab(
             ) {
                 // 已同步录音材料笔记
                 item {
-                    Text("已同步录音笔记 (01-Raw/录音材料)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("已同步录音笔记", style = TPType.rowTitle)
                 }
 
                 items(state.obsidianNotes, key = { it.path }) { note ->
-                    TPCard(modifier = Modifier.animateItem().fillMaxWidth()) {
+                    Column(modifier = Modifier.animateItem().fillMaxWidth().padding(vertical = 10.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(note.title, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text(note.title, style = TPType.body, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                             TPBadge(text = note.persona, variant = TPBadgeVariant.YELLOW)
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(note.path, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(note.path, style = TPType.caption, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 }
 
                 // LMMWiki 核心实体
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("LMMWiki 核心实体与概念", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Wiki 核心实体与概念", style = TPType.rowTitle)
                 }
 
                 items(state.obsidianEntities, key = { it.name }) { entity ->
-                    TPCard(modifier = Modifier.animateItem().fillMaxWidth()) {
+                    Column(modifier = Modifier.animateItem().fillMaxWidth().padding(vertical = 10.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(entity.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = brandAccentColor())
+                            Text(entity.name, style = TPType.body, fontWeight = FontWeight.SemiBold, color = brandAccentColor())
                             TPBadge(text = entity.category, variant = TPBadgeVariant.BLUE)
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(entity.description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                        if (entity.description.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(entity.description, style = TPType.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 }
             }
         }

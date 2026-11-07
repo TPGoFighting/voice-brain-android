@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +52,7 @@ import top.tpgofighting.voicebrain.ui.components.brandAccentColor
 import top.tpgofighting.voicebrain.ui.theme.TPAccentBlue
 import top.tpgofighting.voicebrain.ui.theme.TPMustardYellow
 import top.tpgofighting.voicebrain.ui.theme.TPNavyDark
+import top.tpgofighting.voicebrain.ui.theme.TPType
 import top.tpgofighting.voicebrain.ui.viewmodel.MainUiState
 
 /**
@@ -83,7 +85,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) },
+                title = { Text("设置", style = TPType.pageTitle) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Lucide.ArrowLeft, contentDescription = "返回", modifier = Modifier.size(20.dp))
@@ -101,7 +103,7 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
             contentPadding = PaddingValues(top = 6.dp, bottom = 96.dp)
         ) {
             item {
@@ -213,7 +215,7 @@ private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp)
         )
-        TPCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             content()
         }
     }
@@ -236,8 +238,8 @@ private fun SettingsRow(
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = brandAccentColor())
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, fontSize = 11.sp, lineHeight = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = TPType.rowTitle)
+            Text(subtitle, style = TPType.caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (actionLabel != null) {
             // 行内动作只是跳系统设置，降为文字按钮，不与主 CTA 抢权重（PM 审查 P2）
@@ -259,21 +261,15 @@ private fun SettingsRow(
 private fun SelectChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .border(
-                1.dp,
-                if (selected) TPNavyDark else MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
-                RoundedCornerShape(50)
-            )
-            .background(if (selected) TPMustardYellow else MaterialTheme.colorScheme.surface, RoundedCornerShape(50))
+            .background(if (selected) TPNavyDark else MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(50))
             .clip(RoundedCornerShape(50))
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Text(
             label,
-            fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            color = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurface
+            style = TPType.label,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -282,12 +278,7 @@ private fun SelectChip(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun ThemeChip(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .border(
-                1.dp,
-                if (selected) TPNavyDark else MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
-                RoundedCornerShape(12.dp)
-            )
-            .background(if (selected) TPMustardYellow else MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .background(if (selected) TPNavyDark else MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -300,13 +291,13 @@ private fun ThemeChip(label: String, icon: ImageVector, selected: Boolean, onCli
                 icon,
                 contentDescription = null,
                 modifier = Modifier.size(14.dp),
-                tint = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 label,
                 fontSize = 11.sp,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (selected) TPNavyDark else MaterialTheme.colorScheme.onSurface
+                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface
             )
         }
     }
