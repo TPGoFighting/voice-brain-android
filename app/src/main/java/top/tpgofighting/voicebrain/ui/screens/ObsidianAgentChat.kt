@@ -61,7 +61,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 // xchange 助手设计语言移植（结构与动效参照其 React 实现，文案与数据均为录音豆自有）
-private val ObViolet = Color(0xFF7C4DFF)
+private val ObAccent = Color(0xFFFE5D02)
 private val ObEmerald = Color(0xFF10B981)
 private val ObAmber = Color(0xFFF59E0B)
 private val ObRed = Color(0xFFEF4444)
@@ -134,11 +134,11 @@ fun OrbAvatar(size: Dp, modifier: Modifier = Modifier, animate: Boolean = true) 
         val d = s * 0.88f // 球体直径（留出光晕边距）
         val r = d / 2f
         // 外发光
-        drawCircle(ObViolet.copy(alpha = 0.18f), radius = s * 0.5f, center = c)
+        drawCircle(ObAccent.copy(alpha = 0.18f), radius = s * 0.5f, center = c)
         // 球体：径向渐变（圆心 50%/45%）
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Color(0xFF3F1D8F), Color(0xFF7C4DFF), Color(0xFFB9A3FF), Color(0xFFE9E2FF)),
+                colors = listOf(Color(0xFF7C2A06), Color(0xFFFE5D02), Color(0xFFFFB08A), Color(0xFFFFF1E6)),
                 center = Offset(c.x, c.y - d * 0.05f),
                 radius = r * 1.05f
             ),
@@ -167,7 +167,7 @@ fun OrbAvatar(size: Dp, modifier: Modifier = Modifier, animate: Boolean = true) 
         val eh = d * 0.208333f
         val gap = d * 0.208333f
         val eyeY = c.y - d * 0.041667f
-        val eyeBrush = Brush.verticalGradient(listOf(Color.White, Color(0xFFE6DCFF)))
+        val eyeBrush = Brush.verticalGradient(listOf(Color.White, Color(0xFFFFE8D6)))
         listOf(-1f to 0f, 1f to 60f).forEach { (side, delayMs) ->
             val h = eh * eyeScale(delayMs)
             val cx = c.x + side * (ew / 2f + gap / 2f)
@@ -721,7 +721,7 @@ private fun ObThinkingSteps(steps: List<ObStep>) {
                             text = if (detailOpen) "收起执行明细" else "查看执行明细",
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Medium,
-                            color = ObViolet,
+                            color = ObAccent,
                             modifier = Modifier
                                 .padding(top = 2.dp)
                                 .clickable { detailOpen = !detailOpen }
@@ -784,7 +784,7 @@ fun ObSubAgentCard(
                 Lucide.Brain,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp).padding(top = 1.dp),
-                tint = ObViolet
+                tint = ObAccent
             )
             Column(Modifier.weight(1f)) {
                 Text("子 Agent · Obsidian 知识库", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -838,14 +838,14 @@ fun ObSubAgentCard(
                 CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
                     strokeWidth = 2.dp,
-                    color = ObViolet
+                    color = ObAccent
                 )
                 LinearProgressIndicator(
                     modifier = Modifier
                         .weight(1f)
                         .height(4.dp)
                         .clip(RoundedCornerShape(50)),
-                    color = ObViolet,
+                    color = ObAccent,
                     trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
                 )
                 Text(
@@ -877,14 +877,14 @@ private fun ObSourceRow(index: Int, ref: ObsidianSourceRef, onClick: () -> Unit)
             modifier = Modifier
                 .size(18.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(ObViolet.copy(alpha = 0.15f)),
+                .background(ObAccent.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = index.toString(),
                 fontSize = 10.5.sp,
                 fontWeight = FontWeight.Bold,
-                color = ObViolet
+                color = ObAccent
             )
         }
         Icon(
@@ -1111,7 +1111,7 @@ private fun ObLiveTurn(state: MainUiState, query: String) {
         ObSubAgentCard(
             query = query,
             badgeText = "执行中",
-            badgeColor = ObViolet,
+            badgeColor = ObAccent,
             steps = listOf(
                 ObStep(Lucide.Search, "混合检索", "正在多路召回并排序", ObStepStatus.ACTIVE)
             ),
@@ -1318,7 +1318,7 @@ private fun VaultNoteDialog(note: VaultNoteUiState, onClose: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = ObViolet)
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = ObAccent)
                     Text("正在读取笔记原文…", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 note.error.isNotEmpty() -> Text(
