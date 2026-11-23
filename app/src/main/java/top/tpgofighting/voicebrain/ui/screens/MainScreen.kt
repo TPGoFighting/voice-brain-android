@@ -370,7 +370,6 @@ private fun AppDrawerSheet(
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 24.dp)
         ) {
             // 品牌头：TP 正式线稿 Logo + 名称
@@ -430,11 +429,11 @@ private fun AppDrawerSheet(
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
 
-            // 历史会话
+            // 历史会话（独立滚动区，保证底部设置入口始终可见）
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -451,16 +450,21 @@ private fun AppDrawerSheet(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            if (state.sessions.isEmpty()) {
-                Text(
-                    "暂无历史会话，录一段就会出现在这里",
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                if (state.sessions.isEmpty()) {
+                    Text(
+                        "暂无历史会话，录一段就会出现在这里",
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                } else {
                     state.sessions.take(8).forEach { session ->
                         Column(
                             modifier = Modifier
@@ -507,11 +511,11 @@ private fun AppDrawerSheet(
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // 设置入口：与导航行同一标尺
+            // 设置入口：固定在底部，始终可见
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -524,7 +528,7 @@ private fun AppDrawerSheet(
                 Icon(Lucide.Settings2, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("设置", fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 "voice.tpgofighting.top",
                 fontSize = 11.sp,

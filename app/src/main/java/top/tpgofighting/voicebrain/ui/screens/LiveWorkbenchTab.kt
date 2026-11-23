@@ -694,29 +694,25 @@ fun LiveWorkbenchTab(
 @Composable
 internal fun SessionSourceBadge(source: String, modifier: Modifier = Modifier) {
     val label = sourceBadgeLabel(source)
-    val variant = when (source.trim().lowercase()) {
-        "desktop", "mac", "macos" -> TPBadgeVariant.BLUE
-        "web", "browser" -> TPBadgeVariant.GREEN
-        "android", "mobile", "" -> TPBadgeVariant.YELLOW
-        else -> null
+    val (bgColor, textColor, borderColor) = when (source.trim().lowercase()) {
+        "desktop", "mac", "macos" -> Triple(Color(0xFFE8EDF5), TPNavyDark, TPNavyDark)
+        "web", "browser" -> Triple(TPAccentGreenLight, TPAccentGreen, TPAccentGreen)
+        "android", "mobile", "" -> Triple(TPAccentYellowLight, Color(0xFFB45309), TPMustardYellowDark)
+        else -> Triple(TPNeutralFill, TPNavyDark, TPTextMutedLight)
     }
-    if (variant != null) {
-        TPBadge(text = label, variant = variant, modifier = modifier)
-    } else {
-        // 未知来源（如 import / ios）采用不透明浅底 + 深藏青字，避免深色模式在浅黄回看横幅上白字撞底
-        Box(
-            modifier = modifier
-                .border(1.dp, TPTextMutedLight, RoundedCornerShape(6.dp))
-                .background(TPNeutralFill, RoundedCornerShape(6.dp))
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-        ) {
-            Text(
-                text = label,
-                color = TPNavyDark,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+    Box(
+        modifier = modifier
+            .border(1.dp, borderColor, RoundedCornerShape(6.dp))
+            .background(bgColor, RoundedCornerShape(6.dp))
+            .padding(horizontal = 5.dp, vertical = 1.dp)
+    ) {
+        Text(
+            text = label,
+            color = textColor,
+            fontSize = 10.sp,
+            lineHeight = 13.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
