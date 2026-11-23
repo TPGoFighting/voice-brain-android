@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,6 +43,7 @@ import top.tpgofighting.voicebrain.ui.components.TPBadge
 import top.tpgofighting.voicebrain.ui.components.TPBadgeVariant
 import top.tpgofighting.voicebrain.ui.components.TPLogoTile
 import top.tpgofighting.voicebrain.ui.theme.TPMustardYellow
+import top.tpgofighting.voicebrain.ui.theme.TPMustardYellowDark
 import top.tpgofighting.voicebrain.ui.theme.TPNavyDark
 import top.tpgofighting.voicebrain.ui.viewmodel.MainViewModel
 
@@ -284,6 +286,7 @@ fun MainScreen(
                         onDiarize = { viewModel.diarizeCurrentRecording() },
                         onOpenSession = { viewModel.loadSession(it) },
                         onRefreshSessions = { viewModel.refreshSessions() },
+                        onMyNotesChange = { viewModel.updateMyNotes(it) },
                         onBatteryExemption = { viewModel.requestBatteryExemption() },
                         onAutoStartSettings = { viewModel.openAutoStartSettings() },
                         onConfirmMicPermission = { viewModel.confirmMicPermissionRequest() },
@@ -458,15 +461,32 @@ private fun AppDrawerSheet(
                                 .heightIn(min = 48.dp)
                                 .clickable { onOpenSession(session.id) }
                                 .padding(horizontal = 12.dp, vertical = 9.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Text(
-                                session.title.ifBlank { "未命名会话" },
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    session.title.ifBlank { "未命名会话" },
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (session.myNotes.isNotBlank()) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Edit,
+                                        contentDescription = "含手写笔记",
+                                        tint = TPMustardYellowDark,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
+                                SessionSourceBadge(source = session.source)
+                            }
                             val metaParts = mutableListOf<String>()
                             if (session.stamp.isNotBlank()) metaParts += session.stamp
                             if (session.durationLabel.isNotBlank()) metaParts += session.durationLabel

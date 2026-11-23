@@ -41,6 +41,9 @@ class AsrWebSocketManager(
     // stable session id for this recording: sent on every (re)connect so the server resumes the same session
     private var sessionId: String = ""
 
+    val currentSessionId: String
+        get() = sessionId
+
     // reconnect backoff counter (0.5s -> 1s -> 2s -> 4s cap), reset on open
     private var reconnectAttempts = 0
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())

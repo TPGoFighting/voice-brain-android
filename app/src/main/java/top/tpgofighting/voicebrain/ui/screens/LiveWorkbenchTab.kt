@@ -38,9 +38,11 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.tpgofighting.voicebrain.model.Utterance
@@ -73,6 +75,7 @@ fun LiveWorkbenchTab(
     onDiarize: () -> Unit = {},
     onOpenSession: (String) -> Unit = {},
     onRefreshSessions: () -> Unit = {},
+    onMyNotesChange: (String) -> Unit = {},
     onBatteryExemption: () -> Unit = {},
     onAutoStartSettings: () -> Unit = {},
     onConfirmMicPermission: () -> Unit = {},
@@ -83,6 +86,12 @@ fun LiveWorkbenchTab(
     var showArchive by remember { mutableStateOf(false) }
     var showSourceSheet by remember { mutableStateOf(false) }
     var showSettingsSheet by remember { mutableStateOf(false) }
+    var notesExpanded by remember { mutableStateOf(state.myNotes.isNotBlank()) }
+
+    // 切换会话或新开录音时，若该会话已有笔记则自动展开，空笔记则保持折叠不占高度
+    LaunchedEffect(state.currentSessionId, state.viewingSessionTitle) {
+        notesExpanded = state.myNotes.isNotBlank()
+    }
 
     // 自动滚动至最新的转写句子
     LaunchedEffect(state.utterances.size, state.interimText) {
@@ -163,8 +172,11 @@ fun LiveWorkbenchTab(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TPNavyDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
+                SessionSourceBadge(source = state.currentSessionSource)
             }
         }
 
@@ -282,6 +294,15 @@ fun LiveWorkbenchTab(
             )
         }
 
+        // Yogurt 风格手写笔记（可折叠，录音中/回看历史会话均可随时记录，1s 自动同步并引导纪要）
+        MyNotesEditorCard(
+            notes = state.myNotes,
+            saveState = state.myNotesSaveState,
+            expanded = notesExpanded,
+            onToggleExpand = { notesExpanded = !notesExpanded },
+            onNotesChange = onMyNotesChange
+        )
+
         // 转写工具行：仅有内容时出现（规格 §2.1）——左迷你分段，右分离/归档图标钮
         if (state.utterances.isNotEmpty()) {
             Row(
@@ -374,7 +395,7 @@ fun LiveWorkbenchTab(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
-                items(state.utterances, key = { it.sentenceId }) { u ->
+                items(state.utterances, key = { "${it.id}-${it.sentenceId}" }) { u ->
                     Box(Modifier.animateItem()) {
                         UtteranceItemRow(utterance = u, showCleansed = state.showCleansed)
                     }
@@ -586,14 +607,32 @@ fun LiveWorkbenchTab(
                                         onOpenSession(session.id)
                                         showArchive = false
                                     }
-                                    .padding(10.dp)
+                                    .padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(
-                                    text = session.title,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = session.title,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (session.myNotes.isNotBlank()) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Edit,
+                                            contentDescription = "含手写笔记",
+                                            tint = TPMustardYellowDark,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                    }
+                                    SessionSourceBadge(source = session.source)
+                                }
                                 Text(
                                     text = "${session.stamp.take(16).replace("T", " ")} · ${session.utteranceCount} 句",
                                     fontSize = 11.sp,
@@ -653,12 +692,136 @@ fun LiveWorkbenchTab(
 }
 
 @Composable
+internal fun SessionSourceBadge(source: String, modifier: Modifier = Modifier) {
+    val label = sourceBadgeLabel(source)
+    val variant = when (source.trim().lowercase()) {
+        "desktop", "mac", "macos" -> TPBadgeVariant.BLUE
+        "web", "browser" -> TPBadgeVariant.GREEN
+        "android", "mobile", "" -> TPBadgeVariant.YELLOW
+        else -> TPBadgeVariant.OUTLINE
+    }
+    TPBadge(text = label, variant = variant, modifier = modifier)
+}
+
+@Composable
+private fun MyNotesEditorCard(
+    notes: String,
+    saveState: String,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onNotesChange: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(TPRadius.md))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                width = 1.dp,
+                color = if (expanded) TPMustardYellowDark.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(TPRadius.md)
+            )
+            .animateContentSize()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onToggleExpand() }
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Edit,
+                contentDescription = null,
+                tint = if (notes.isNotBlank() || expanded) TPMustardYellowDark else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp)
+            )
+            Text(
+                text = "手写笔记",
+                style = TPType.label,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (!expanded && notes.isNotBlank()) {
+                Text(
+                    text = notes.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: "",
+                    style = TPType.caption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            if (saveState.isNotBlank()) {
+                val statusColor = when (saveState) {
+                    "已保存" -> TPAccentGreen
+                    "离线暂存" -> TPWarning
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+                Text(
+                    text = saveState,
+                    style = TPType.caption,
+                    fontWeight = FontWeight.Medium,
+                    color = statusColor
+                )
+            }
+            Icon(
+                imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                contentDescription = if (expanded) "收起手写笔记" else "展开手写笔记",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        AnimatedVisibility(visible = expanded) {
+            OutlinedTextField(
+                value = notes,
+                onValueChange = onNotesChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+                minLines = 3,
+                maxLines = 6,
+                textStyle = TPType.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                placeholder = {
+                    Text(
+                        text = "记录会议重点、待办或会后要强调的事实（自动保存并引导纪要生成）",
+                        style = TPType.caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                shape = RoundedCornerShape(TPRadius.sm),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = TPMustardYellowDark,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                    focusedContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.5f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.5f)
+                )
+            )
+        }
+    }
+}
+
+@Composable
 fun UtteranceItemRow(utterance: Utterance, showCleansed: Boolean = false) {
     val displayText = if (showCleansed && !utterance.cleansedText.isNullOrBlank()) {
         utterance.cleansedText!!
     } else {
         utterance.rawText.ifBlank { utterance.text }
     }
+    val displaySpeaker = utteranceDisplaySpeaker(utterance)
+    val trackNormalized = utterance.track.trim().lowercase()
+    val isDualTrack = trackNormalized == "me" || trackNormalized == "them"
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val accentColor = when (trackNormalized) {
+        "me" -> if (isDark) Color(0xFF60A5FA) else TPAccentBlue
+        "them" -> if (isDark) Color(0xFF34D399) else Color(0xFF059669)
+        else -> speakerColor(displaySpeaker)
+    }
+
     // 文档流行：说话人色点 + 名字 + 时间一行，正文 15sp/24sp，无卡无边（规格 §2.1）
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
@@ -666,17 +829,41 @@ fun UtteranceItemRow(utterance: Utterance, showCleansed: Boolean = false) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .clip(CircleShape)
-                    .background(speakerColor(utterance.speaker))
-            )
-            Text(
-                text = utterance.speaker,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            if (isDualTrack) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(TPRadius.xs))
+                        .background(accentColor.copy(alpha = if (isDark) 0.18f else 0.10f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(accentColor)
+                    )
+                    Text(
+                        text = displaySpeaker,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accentColor
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(accentColor)
+                )
+                Text(
+                    text = displaySpeaker,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
             Text(
                 text = utterance.time,
                 style = TPType.caption,

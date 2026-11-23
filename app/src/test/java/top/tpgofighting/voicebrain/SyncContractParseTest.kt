@@ -17,6 +17,9 @@ import top.tpgofighting.voicebrain.data.api.parseSessionDetailBody
 import top.tpgofighting.voicebrain.data.api.parseSessionsBody
 import top.tpgofighting.voicebrain.model.Persona
 import top.tpgofighting.voicebrain.model.Utterance
+import top.tpgofighting.voicebrain.ui.screens.resolveLoadedMyNotes
+import top.tpgofighting.voicebrain.ui.screens.sourceBadgeLabel
+import top.tpgofighting.voicebrain.ui.screens.utteranceDisplaySpeaker
 
 /**
  * 锁定 Scheme B（酸奶跨端同步）接口解析与请求构造契约：
@@ -318,5 +321,84 @@ class SyncContractParseTest {
             myNotes = "   "
         )
         assertNull(withoutNotes["myNotes"])
+    }
+
+    @Test
+    fun sourceBadgeLabelMapsMultiDeviceSourcesCleanly() {
+        assertEquals("Mac", sourceBadgeLabel("desktop"))
+        assertEquals("Mac", sourceBadgeLabel("DESKTOP"))
+        assertEquals("Mac", sourceBadgeLabel("mac"))
+        assertEquals("Web", sourceBadgeLabel("web"))
+        assertEquals("Web", sourceBadgeLabel("  Web  "))
+        assertEquals("Android", sourceBadgeLabel("android"))
+        assertEquals("Android", sourceBadgeLabel(""))
+        assertEquals("Android", sourceBadgeLabel("   "))
+        assertEquals("ios", sourceBadgeLabel("ios"))
+    }
+
+    @Test
+    fun utteranceDisplaySpeakerHandlesDualTrackAndDiarizedLabels() {
+        val meDefault = Utterance(
+            id = 1,
+            sentenceId = "m1",
+            speaker = "发言人",
+            time = "10:00:01",
+            text = "我来说一下方案",
+            rawText = "我来说一下方案",
+            track = "me"
+        )
+        assertEquals("我", utteranceDisplaySpeaker(meDefault))
+
+        val meBlank = meDefault.copy(speaker = "  ")
+        assertEquals("我", utteranceDisplaySpeaker(meBlank))
+
+        val themDefault = Utterance(
+            id = 2,
+            sentenceId = "t1",
+            speaker = "发言人",
+            time = "10:00:05",
+            text = "同意这个时间节点",
+            rawText = "同意这个时间节点",
+            track = "them"
+        )
+        assertEquals("对方", utteranceDisplaySpeaker(themDefault))
+
+        val themCustom = themDefault.copy(speaker = "客户王总")
+        assertEquals("客户王总", utteranceDisplaySpeaker(themCustom))
+
+        val singleDiarized = Utterance(
+            id = 3,
+            sentenceId = "s1",
+            speaker = "发言人 2",
+            time = "10:00:09",
+            text = "补充一点",
+            rawText = "补充一点",
+            track = "single"
+        )
+        assertEquals("发言人 2", utteranceDisplaySpeaker(singleDiarized))
+
+        val singleBlank = singleDiarized.copy(speaker = "")
+        assertEquals("发言人", utteranceDisplaySpeaker(singleBlank))
+    }
+
+    @Test
+    fun resolveLoadedMyNotesPrefersLocalOfflineDraftOverServer() {
+        assertEquals(
+            "离线草稿内容" to "离线暂存",
+            resolveLoadedMyNotes(serverNotes = "服务端旧内容", localDraft = "离线草稿内容")
+        )
+        // 用户离线主动清空笔记时仍应保留空草稿，避免旧内容复活
+        assertEquals(
+            "" to "离线暂存",
+            resolveLoadedMyNotes(serverNotes = "服务端旧内容", localDraft = "")
+        )
+        assertEquals(
+            "来自 Mac 端笔记" to "已保存",
+            resolveLoadedMyNotes(serverNotes = "来自 Mac 端笔记", localDraft = null)
+        )
+        assertEquals(
+            "" to "",
+            resolveLoadedMyNotes(serverNotes = "", localDraft = null)
+        )
     }
 }
