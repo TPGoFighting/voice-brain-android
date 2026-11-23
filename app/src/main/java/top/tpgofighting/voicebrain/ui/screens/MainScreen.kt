@@ -89,6 +89,7 @@ fun MainScreen(
             onThemeModeChange = onThemeModeChange,
             onSetSilence = { viewModel.setSentenceSilence(it) },
             onToggleCleansed = { viewModel.toggleShowCleansed(it) },
+            onSyncTokenChange = { viewModel.updateSyncToken(it) },
             onBatteryExemption = { viewModel.requestBatteryExemption() },
             onAutoStartSettings = { viewModel.openAutoStartSettings() },
             onOpenHistory = { showSettings = false; scope.launch { drawerState.open() } },

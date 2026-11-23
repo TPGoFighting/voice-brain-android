@@ -96,6 +96,9 @@ data class MainUiState(
     val batteryHintHandled: Boolean = false,
     val hasRecordedOnce: Boolean = false,
 
+    // 跨端同步鉴权令牌（留空则不发送 Authorization / authToken）
+    val syncToken: String = "",
+
     // 全局提示信息 (Toast / Banner)
     val toastMessage: String? = null
 )
@@ -120,9 +123,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val VOLUME_HISTORY_MAX = 48
         private const val PREF_BATTERY_HINT_HANDLED = "battery_hint_handled"
         private const val PREF_HAS_RECORDED_ONCE = "has_recorded_once"
+        private const val PREF_SYNC_TOKEN = "sync_api_token"
     }
-
-    private val apiClient = VoiceBrainApiClient()
 
     private val prefs by lazy {
         getApplication<Application>().getSharedPreferences("voicebrain_prefs", Context.MODE_PRIVATE)
@@ -130,6 +132,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    private val apiClient = VoiceBrainApiClient(
+        syncTokenProvider = { _uiState.value.syncToken }
+    )
 
     private val _uiEvents = MutableSharedFlow<MainUiEvent>(extraBufferCapacity = 1)
     val uiEvents: SharedFlow<MainUiEvent> = _uiEvents.asSharedFlow()
@@ -140,16 +146,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var obsidianAskJob: Job? = null
 
     init {
+        _uiState.update {
+            it.copy(
+                batteryHintHandled = prefs.getBoolean(PREF_BATTERY_HINT_HANDLED, false),
+                hasRecordedOnce = prefs.getBoolean(PREF_HAS_RECORDED_ONCE, false),
+                syncToken = prefs.getString(PREF_SYNC_TOKEN, "") ?: ""
+            )
+        }
         initWelcomeMessages()
         fetchRemoteData()
         refreshAudioDevices()
         refreshBatteryState()
-        _uiState.update {
-            it.copy(
-                batteryHintHandled = prefs.getBoolean(PREF_BATTERY_HINT_HANDLED, false),
-                hasRecordedOnce = prefs.getBoolean(PREF_HAS_RECORDED_ONCE, false)
-            )
-        }
     }
 
     private fun initWelcomeMessages() {
@@ -312,7 +319,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // 启动 WebSocket
         webSocketManager = AsrWebSocketManager(
-            sentenceSilenceMs = _uiState.value.sentenceSilenceMs
+            sentenceSilenceMs = _uiState.value.sentenceSilenceMs,
+            syncTokenProvider = { _uiState.value.syncToken }
         ) { event ->
             handleAsrEvent(event)
         }
@@ -488,6 +496,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleShowCleansed(show: Boolean) {
         _uiState.update { it.copy(showCleansed = show) }
+    }
+
+    fun updateSyncToken(token: String) {
+        val cleaned = token.trim()
+        _uiState.update { it.copy(syncToken = cleaned) }
+        prefs.edit().putString(PREF_SYNC_TOKEN, cleaned).apply()
     }
 
     /** 从归档打开一个历史会话到工作台（只读回看，可继续做分离/纪要） */

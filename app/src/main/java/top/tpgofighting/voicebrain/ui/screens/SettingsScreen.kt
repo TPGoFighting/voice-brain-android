@@ -17,15 +17,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +42,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.ArrowLeft
@@ -52,6 +64,7 @@ import top.tpgofighting.voicebrain.ui.components.brandAccentColor
 import top.tpgofighting.voicebrain.ui.theme.TPAccentBlue
 import top.tpgofighting.voicebrain.ui.theme.TPMustardYellow
 import top.tpgofighting.voicebrain.ui.theme.TPNavyDark
+import top.tpgofighting.voicebrain.ui.theme.TPRadius
 import top.tpgofighting.voicebrain.ui.theme.TPType
 import top.tpgofighting.voicebrain.ui.viewmodel.MainUiState
 
@@ -67,6 +80,7 @@ fun SettingsScreen(
     onThemeModeChange: (String) -> Unit,
     onSetSilence: (Int) -> Unit,
     onToggleCleansed: (Boolean) -> Unit,
+    onSyncTokenChange: (String) -> Unit = {},
     onBatteryExemption: () -> Unit,
     onAutoStartSettings: () -> Unit,
     onOpenHistory: () -> Unit,
@@ -174,6 +188,44 @@ fun SettingsScreen(
                         actionLabel = null,
                         onAction = {}
                     )
+                    Spacer(Modifier.height(8.dp))
+                    var tokenVisible by remember { mutableStateOf(false) }
+                    Text("同步令牌", style = TPType.rowTitle)
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = state.syncToken,
+                        onValueChange = onSyncTokenChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("输入 SYNC_API_TOKEN（可选）", style = TPType.bodySmall) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(TPRadius.md),
+                        visualTransformation = if (tokenVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                                Icon(
+                                    imageVector = if (tokenVisible) {
+                                        Icons.Outlined.VisibilityOff
+                                    } else {
+                                        Icons.Outlined.Visibility
+                                    },
+                                    contentDescription = if (tokenVisible) "隐藏同步令牌" else "显示同步令牌",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "留空则不发送鉴权头；与服务端 SYNC_API_TOKEN 一致",
+                        style = TPType.caption,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
                     SettingsRow(
                         icon = Lucide.Info,
                         title = "历史会话",

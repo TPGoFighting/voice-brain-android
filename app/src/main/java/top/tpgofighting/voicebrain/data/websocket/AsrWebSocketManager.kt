@@ -22,6 +22,7 @@ sealed class AsrEvent {
 class AsrWebSocketManager(
     private val serverUrl: String = "wss://voice.tpgofighting.top/ws/asr",
     private var sentenceSilenceMs: Int = 800,
+    private val syncTokenProvider: () -> String = { "" },
     private val onEvent: (AsrEvent) -> Unit
 ) {
     companion object {
@@ -71,13 +72,13 @@ class AsrWebSocketManager(
     }
 
     private fun connect() {
-        val request = Request.Builder().url(serverUrl).build()
+        val request = buildWebSocketRequest(serverUrl, syncTokenProvider())
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 Log.i(TAG, "WebSocket connected to $serverUrl")
                 isConnected = true
                 reconnectAttempts = 0
-                ws.send("""{"type":"start","sessionId":"$sessionId","maxSentenceSilence":$sentenceSilenceMs}""")
+                ws.send(buildStartCommandJson(sessionId, sentenceSilenceMs, syncTokenProvider()))
 
                 // 冲刷缓冲的 PCM 队列
                 flushBuffer()
@@ -244,4 +245,29 @@ class AsrWebSocketManager(
             pcmBuffer.clear()
         }
     }
+}
+
+internal fun buildWebSocketRequest(serverUrl: String, syncToken: String = ""): Request {
+    val builder = Request.Builder().url(serverUrl)
+    val trimmed = syncToken.trim()
+    if (trimmed.isNotEmpty()) {
+        builder.header("Authorization", "Bearer $trimmed")
+    }
+    return builder.build()
+}
+
+internal fun buildStartCommandJson(
+    sessionId: String,
+    sentenceSilenceMs: Int,
+    syncToken: String = ""
+): String {
+    val trimmed = syncToken.trim()
+    return buildJsonObject {
+        put("type", "start")
+        put("sessionId", sessionId)
+        put("maxSentenceSilence", sentenceSilenceMs)
+        if (trimmed.isNotEmpty()) {
+            put("authToken", trimmed)
+        }
+    }.toString()
 }
