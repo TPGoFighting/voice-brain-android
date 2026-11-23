@@ -41,6 +41,9 @@ data class DiarizedSentence(
     val text: String
 )
 
+/** HTTP 非 2xx 状态码异常，便于调用方精确区分 404 等业务分支 */
+class HttpStatusException(val code: Int, message: String) : Exception(message)
+
 class VoiceBrainApiClient(
     private val baseUrl: String = "https://voice.tpgofighting.top",
     private val syncTokenProvider: () -> String = { "" }
@@ -391,11 +394,50 @@ class VoiceBrainApiClient(
             val response = client.newCall(request).execute()
             val respBody = response.body?.string() ?: ""
             if (!response.isSuccessful) {
-                return@withContext Result.failure(Exception("HTTP ${response.code}: $respBody"))
+                return@withContext Result.failure(
+                    HttpStatusException(response.code, "HTTP ${response.code}: $respBody")
+                )
             }
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "patchSessionNotes failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 新录音首句尚未落库（PATCH /api/sessions/:id/notes 返回 404）时的兜底建档接口：
+     * 通过 POST /api/sessions 写入会话骨架与 myNotes，不附带 utterances 字段以免覆盖服务端已有逐字稿。
+     */
+    suspend fun upsertSessionNotesFallback(
+        sessionId: String,
+        myNotes: String,
+        source: String = "android",
+        status: String = "recording"
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val bodyJson = buildUpsertSessionNotesPayload(
+                sessionId = sessionId,
+                myNotes = myNotes,
+                source = source,
+                status = status
+            ).toString()
+
+            val request = Request.Builder()
+                .url("$baseUrl/api/sessions")
+                .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(
+                    HttpStatusException(response.code, "HTTP ${response.code}: $respBody")
+                )
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "upsertSessionNotesFallback failed: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -658,6 +700,18 @@ internal fun applyBearerToken(request: Request, rawToken: String): Request {
     return request.newBuilder()
         .header("Authorization", "Bearer $token")
         .build()
+}
+
+internal fun buildUpsertSessionNotesPayload(
+    sessionId: String,
+    myNotes: String,
+    source: String = "android",
+    status: String = "recording"
+): JsonObject = buildJsonObject {
+    put("id", sessionId)
+    put("source", source)
+    put("status", status)
+    put("myNotes", myNotes)
 }
 
 internal fun buildGenerateMinutesPayload(

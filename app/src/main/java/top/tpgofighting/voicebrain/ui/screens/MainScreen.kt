@@ -85,6 +85,10 @@ fun MainScreen(
     }
 
     if (showSettings) {
+        val closeSettings = {
+            showSettings = false
+            viewModel.onSettingsClosed()
+        }
         SettingsScreen(
             state = uiState,
             themeMode = themeMode,
@@ -94,8 +98,11 @@ fun MainScreen(
             onSyncTokenChange = { viewModel.updateSyncToken(it) },
             onBatteryExemption = { viewModel.requestBatteryExemption() },
             onAutoStartSettings = { viewModel.openAutoStartSettings() },
-            onOpenHistory = { showSettings = false; scope.launch { drawerState.open() } },
-            onBack = { showSettings = false }
+            onOpenHistory = {
+                closeSettings()
+                scope.launch { drawerState.open() }
+            },
+            onBack = closeSettings
         )
         return
     }

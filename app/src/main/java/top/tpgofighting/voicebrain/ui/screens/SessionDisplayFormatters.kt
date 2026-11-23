@@ -36,3 +36,34 @@ internal fun resolveLoadedMyNotes(serverNotes: String, localDraft: String?): Pai
     serverNotes.isNotBlank() -> serverNotes to "已保存"
     else -> "" to ""
 }
+
+internal data class StartRecordingNotesPlan(
+    val initialNotes: String,
+    val initialSaveState: String,
+    val preservePreRecordingDraft: Boolean
+)
+
+/**
+ * 决定按下「开始录音」时的手写笔记迁移策略：
+ * - 若离开已有会话（prevSessionId 非空），清空新录音的笔记区（旧会话笔记由调用方补推）。
+ * - 若在录音前（prevSessionId 为空）已写下会前要点，则保留并准备迁移到新录音会话。
+ */
+internal fun resolveStartRecordingNotes(
+    prevSessionId: String,
+    prevNotes: String
+): StartRecordingNotesPlan {
+    val preserve = prevSessionId.isBlank() && prevNotes.isNotBlank()
+    return if (preserve) {
+        StartRecordingNotesPlan(
+            initialNotes = prevNotes,
+            initialSaveState = "保存中…",
+            preservePreRecordingDraft = true
+        )
+    } else {
+        StartRecordingNotesPlan(
+            initialNotes = "",
+            initialSaveState = "",
+            preservePreRecordingDraft = false
+        )
+    }
+}

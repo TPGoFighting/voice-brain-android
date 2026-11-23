@@ -698,9 +698,26 @@ internal fun SessionSourceBadge(source: String, modifier: Modifier = Modifier) {
         "desktop", "mac", "macos" -> TPBadgeVariant.BLUE
         "web", "browser" -> TPBadgeVariant.GREEN
         "android", "mobile", "" -> TPBadgeVariant.YELLOW
-        else -> TPBadgeVariant.OUTLINE
+        else -> null
     }
-    TPBadge(text = label, variant = variant, modifier = modifier)
+    if (variant != null) {
+        TPBadge(text = label, variant = variant, modifier = modifier)
+    } else {
+        // 未知来源（如 import / ios）采用不透明浅底 + 深藏青字，避免深色模式在浅黄回看横幅上白字撞底
+        Box(
+            modifier = modifier
+                .border(1.dp, TPTextMutedLight, RoundedCornerShape(6.dp))
+                .background(TPNeutralFill, RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = label,
+                color = TPNavyDark,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
 }
 
 @Composable

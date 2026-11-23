@@ -359,6 +359,7 @@ internal fun buildStartCommandJson(
     return buildJsonObject {
         put("type", "start")
         put("sessionId", sessionId)
+        put("source", "android")
         put("maxSentenceSilence", sentenceSilenceMs)
         if (sanitized.isNotEmpty()) {
             put("authToken", sanitized)

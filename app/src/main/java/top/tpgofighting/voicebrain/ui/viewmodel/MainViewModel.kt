@@ -9,16 +9,19 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import top.tpgofighting.voicebrain.data.api.HttpStatusException
 import top.tpgofighting.voicebrain.data.api.VoiceBrainApiClient
 import top.tpgofighting.voicebrain.data.api.sanitizeSyncToken
 import top.tpgofighting.voicebrain.data.audio.AudioRecorderManager
 import top.tpgofighting.voicebrain.data.websocket.AsrEvent
 import top.tpgofighting.voicebrain.data.websocket.AsrWebSocketManager
+import top.tpgofighting.voicebrain.data.websocket.WS_UNAUTHORIZED_MESSAGE
 import top.tpgofighting.voicebrain.model.*
 import top.tpgofighting.voicebrain.service.KeepAliveHelper
 import top.tpgofighting.voicebrain.service.RecordingBus
 import top.tpgofighting.voicebrain.service.RecordingService
 import top.tpgofighting.voicebrain.ui.screens.resolveLoadedMyNotes
+import top.tpgofighting.voicebrain.ui.screens.resolveStartRecordingNotes
 import java.io.File
 
 data class MainUiState(
@@ -133,7 +136,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val PREF_HAS_RECORDED_ONCE = "has_recorded_once"
         private const val PREF_SYNC_TOKEN = "sync_api_token"
         private const val PREF_DRAFT_NOTES_PREFIX = "draft_my_notes_"
-        private const val PREF_LAST_ACTIVE_SESSION_ID = "last_active_session_id"
         private const val NOTES_DEBOUNCE_MS = 1000L
     }
 
@@ -157,13 +159,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var obsidianAskJob: Job? = null
     private var notesSaveJob: Job? = null
     private var loadSessionJob: Job? = null
+    private var lastSyncedToken: String = ""
 
     init {
+        val initialToken = sanitizeSyncToken(prefs.getString(PREF_SYNC_TOKEN, "") ?: "")
+        lastSyncedToken = initialToken
         _uiState.update {
             it.copy(
                 batteryHintHandled = prefs.getBoolean(PREF_BATTERY_HINT_HANDLED, false),
                 hasRecordedOnce = prefs.getBoolean(PREF_HAS_RECORDED_ONCE, false),
-                syncToken = sanitizeSyncToken(prefs.getString(PREF_SYNC_TOKEN, "") ?: "")
+                syncToken = initialToken
             )
         }
         initWelcomeMessages()
@@ -197,6 +202,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun fetchRemoteData() {
         viewModelScope.launch {
+            flushPendingNotesDrafts()
+
             val memRes = apiClient.fetchMemories()
             if (memRes.isSuccess) {
                 _uiState.update { it.copy(memories = memRes.getOrNull() ?: emptyList()) }
@@ -207,7 +214,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update { it.copy(obsidianStatus = obsRes.getOrNull() ?: ObsidianStatus()) }
             }
 
-            refreshSessions()
+            refreshSessionsInternal()
+        }
+    }
+
+    /** 启动或重新拉取远端数据时，将本地未同步的会话笔记草稿补推回服务端（不复活已删除会话） */
+    private suspend fun flushPendingNotesDrafts() {
+        val pendingEntries = prefs.all.entries.mapNotNull { (key, value) ->
+            if (!key.startsWith(PREF_DRAFT_NOTES_PREFIX)) return@mapNotNull null
+            val sessionId = key.removePrefix(PREF_DRAFT_NOTES_PREFIX)
+            if (sessionId.isBlank() || sessionId == "pending" || !sessionId.startsWith("sess-")) {
+                return@mapNotNull null
+            }
+            val draftText = value as? String ?: return@mapNotNull null
+            sessionId to draftText
+        }
+        for ((sessionId, draftText) in pendingEntries) {
+            val state = _uiState.value
+            if (sessionId == state.currentSessionId && (state.isRecording || notesSaveJob?.isActive == true)) {
+                continue
+            }
+            syncNotesToServer(
+                sessionId = sessionId,
+                notes = draftText,
+                allowCreateFallback = false
+            )
         }
     }
 
@@ -221,14 +252,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshSessions() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingSessions = true) }
-            val res = apiClient.fetchSessions()
-            _uiState.update {
-                it.copy(
-                    sessions = res.getOrNull() ?: it.sessions,
-                    isLoadingSessions = false
-                )
-            }
+            refreshSessionsInternal()
+        }
+    }
+
+    private suspend fun refreshSessionsInternal() {
+        _uiState.update { it.copy(isLoadingSessions = true) }
+        val res = apiClient.fetchSessions()
+        _uiState.update {
+            it.copy(
+                sessions = res.getOrNull() ?: it.sessions,
+                isLoadingSessions = false
+            )
         }
     }
 
@@ -306,21 +341,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         refreshAudioDevices()
 
-        // 开始新录音前，先将上一会话未落盘的笔记草稿补推到服务端，再清空当前手写笔记
+        // 开始新录音前，先将上一会话未落盘的笔记草稿补推到服务端；若在录音前已写会前要点则保留并迁移
         loadSessionJob?.cancel()
         loadSessionJob = null
         val prevSessionId = _uiState.value.currentSessionId
         val prevNotes = _uiState.value.myNotes
+        val prevViewingTitle = _uiState.value.viewingSessionTitle
         val prevDirty = prevSessionId.isNotBlank() &&
             (readLocalNotesDraft(prevSessionId) != null || notesSaveJob?.isActive == true)
         notesSaveJob?.cancel()
         notesSaveJob = null
         if (prevDirty) {
+            val prevAllowFallback = prevViewingTitle == null && prevSessionId.startsWith("sess-android-")
             viewModelScope.launch {
-                syncNotesToServer(prevSessionId, prevNotes)
+                syncNotesToServer(
+                    sessionId = prevSessionId,
+                    notes = prevNotes,
+                    allowCreateFallback = prevAllowFallback,
+                    fallbackStatus = "done"
+                )
             }
         }
-        clearLocalNotesDraft("")
+        val notesPlan = resolveStartRecordingNotes(prevSessionId, prevNotes)
 
         _uiState.update {
             it.copy(
@@ -332,8 +374,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 viewingSessionTitle = null,
                 currentSessionId = "",
                 currentSessionSource = "android",
-                myNotes = "",
-                myNotesSaveState = "",
+                myNotes = notesPlan.initialNotes,
+                myNotesSaveState = notesPlan.initialSaveState,
                 volumeHistory = emptyList(),
                 micPermissionDenied = false,
                 hasRecordedOnce = true
@@ -360,7 +402,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         webSocketManager?.start()
         val newSessionId = webSocketManager?.currentSessionId.orEmpty()
         if (newSessionId.isNotBlank()) {
-            prefs.edit().putString(PREF_LAST_ACTIVE_SESSION_ID, newSessionId).apply()
             _uiState.update { it.copy(currentSessionId = newSessionId) }
         }
 
@@ -389,9 +430,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val started = audioRecorder?.start() ?: false
         if (!started) {
+            if (notesPlan.preservePreRecordingDraft) {
+                _uiState.update {
+                    it.copy(
+                        currentSessionId = "",
+                        myNotes = prevNotes,
+                        myNotesSaveState = "离线暂存"
+                    )
+                }
+            }
             stopRecording()
             showToast("麦克风启动失败，请检查录音权限！")
             return
+        }
+
+        // 录音真正启动成功后，再迁移或清理 draft_my_notes_pending，避免权限/麦克风失败丢稿
+        if (notesPlan.preservePreRecordingDraft && newSessionId.isNotBlank()) {
+            saveLocalNotesDraft(newSessionId, prevNotes)
+            clearLocalNotesDraft("")
+            notesSaveJob?.cancel()
+            notesSaveJob = viewModelScope.launch {
+                delay(NOTES_DEBOUNCE_MS)
+                syncNotesToServer(
+                    sessionId = newSessionId,
+                    notes = prevNotes,
+                    allowCreateFallback = true,
+                    fallbackStatus = "recording"
+                )
+            }
+        } else {
+            clearLocalNotesDraft("")
         }
 
         val deviceLabel = audioRecorder?.activeDeviceLabel ?: "手机内置麦克风"
@@ -413,6 +481,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isRecording = false,
                 currentVolume = 0f,
                 wsStatusText = "录音结束",
+                wsStatusConnected = false,
                 interimText = ""
             )
         }
@@ -436,21 +505,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val wav = audioRecorder?.exportWavFile()
         _uiState.update { it.copy(exportedWavFile = wav) }
 
-        // 录音结束时如仍有防抖中/未同步的手写笔记，立即刷一次到服务端
+        // 录音结束时如仍有防抖中/未同步的手写笔记，先顺序落库再刷新历史会话列表，避免竞态读到旧笔记
         val activeSessionId = _uiState.value.currentSessionId
         val activeNotes = _uiState.value.myNotes
-        if (activeSessionId.isNotBlank() &&
+        val allowFallback = _uiState.value.viewingSessionTitle == null &&
+            activeSessionId.startsWith("sess-android-")
+        val needsNotesFlush = activeSessionId.isNotBlank() &&
             (readLocalNotesDraft(activeSessionId) != null || notesSaveJob?.isActive == true)
-        ) {
+        val hasUtterances = _uiState.value.utterances.isNotEmpty()
+        if (hasUtterances) {
+            showToast("录音已完成并固化，可立即生成纪要！")
+        }
+        if (needsNotesFlush) {
             notesSaveJob?.cancel()
             notesSaveJob = null
             viewModelScope.launch {
-                syncNotesToServer(activeSessionId, activeNotes)
+                val synced = syncNotesToServer(
+                    sessionId = activeSessionId,
+                    notes = activeNotes,
+                    allowCreateFallback = allowFallback,
+                    fallbackStatus = "done"
+                )
+                if (hasUtterances || synced) {
+                    refreshSessionsInternal()
+                }
             }
-        }
-
-        if (_uiState.value.utterances.isNotEmpty()) {
-            showToast("录音已完成并固化，可立即生成纪要！")
+        } else if (hasUtterances) {
             refreshSessions()
         }
     }
@@ -487,6 +567,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             interimText = ""
                         )
                     }
+                    // 首句/新句落库后，若当前会话仍有离线暂存草稿且无进行中的保存任务，自动重试同步转「已保存」
+                    val activeSessionId = _uiState.value.currentSessionId
+                    if (activeSessionId.isNotBlank() &&
+                        readLocalNotesDraft(activeSessionId) != null &&
+                        notesSaveJob?.isActive != true
+                    ) {
+                        val notesSnapshot = _uiState.value.myNotes
+                        val allowFallback = _uiState.value.viewingSessionTitle == null &&
+                            activeSessionId.startsWith("sess-android-")
+                        val fallbackStatus = if (_uiState.value.isRecording) "recording" else "done"
+                        notesSaveJob = viewModelScope.launch {
+                            syncNotesToServer(
+                                sessionId = activeSessionId,
+                                notes = notesSnapshot,
+                                allowCreateFallback = allowFallback,
+                                fallbackStatus = fallbackStatus
+                            )
+                        }
+                    }
                 }
                 is AsrEvent.Cleansed -> {
                     // 清洗稿只进 cleansedText，展示默认仍为原文（与 Web Fix 2 一致）
@@ -509,8 +608,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 is AsrEvent.Error -> {
-                    _uiState.update { it.copy(wsStatusText = "识别异常") }
                     Log.w(TAG, "ASR Error: ${event.message}")
+                    if (event.message == WS_UNAUTHORIZED_MESSAGE) {
+                        if (_uiState.value.isRecording) {
+                            stopRecording()
+                        } else {
+                            audioRecorder?.stop()
+                            try {
+                                getApplication<Application>().stopService(
+                                    Intent(getApplication(), RecordingService::class.java)
+                                )
+                            } catch (e: Exception) {
+                                Log.w(TAG, "stop RecordingService failed: ${e.message}")
+                            }
+                            RecordingBus.onStopRequested = null
+                        }
+                        _uiState.update {
+                            it.copy(
+                                isRecording = false,
+                                wsStatusText = event.message,
+                                wsStatusConnected = false,
+                                interimText = ""
+                            )
+                        }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                wsStatusText = "识别异常",
+                                wsStatusConnected = false
+                            )
+                        }
+                    }
+                    showToast(event.message)
                 }
                 is AsrEvent.Finished -> {
                     _uiState.update { it.copy(wsStatusText = "已完成", wsStatusConnected = false) }
@@ -555,14 +684,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit().putString(PREF_SYNC_TOKEN, cleaned).apply()
     }
 
+    /** 关闭设置页时若同步令牌发生变更，立即重新拉取远端数据并补推离线草稿（修复首次 401 后空态） */
+    fun onSettingsClosed() {
+        val currentToken = _uiState.value.syncToken
+        if (currentToken != lastSyncedToken) {
+            lastSyncedToken = currentToken
+            fetchRemoteData()
+        }
+    }
+
     private fun draftKey(sessionId: String): String =
         if (sessionId.isNotBlank()) "$PREF_DRAFT_NOTES_PREFIX$sessionId" else "${PREF_DRAFT_NOTES_PREFIX}pending"
 
     private fun saveLocalNotesDraft(sessionId: String, notes: String) {
-        prefs.edit().apply {
-            putString(draftKey(sessionId), notes)
-            if (sessionId.isNotBlank()) putString(PREF_LAST_ACTIVE_SESSION_ID, sessionId)
-        }.apply()
+        prefs.edit().putString(draftKey(sessionId), notes).apply()
     }
 
     private fun readLocalNotesDraft(sessionId: String): String? {
@@ -580,6 +715,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun updateMyNotes(notes: String) {
         val sessionId = _uiState.value.currentSessionId
+        val allowFallback = _uiState.value.viewingSessionTitle == null &&
+            sessionId.startsWith("sess-android-")
+        val fallbackStatus = if (_uiState.value.isRecording) "recording" else "done"
         saveLocalNotesDraft(sessionId, notes)
         _uiState.update {
             it.copy(
@@ -593,13 +731,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         notesSaveJob = viewModelScope.launch {
             delay(NOTES_DEBOUNCE_MS)
-            syncNotesToServer(sessionId, notes)
+            syncNotesToServer(
+                sessionId = sessionId,
+                notes = notes,
+                allowCreateFallback = allowFallback,
+                fallbackStatus = fallbackStatus
+            )
         }
     }
 
-    private suspend fun syncNotesToServer(sessionId: String, notes: String): Boolean {
+    private suspend fun syncNotesToServer(
+        sessionId: String,
+        notes: String,
+        allowCreateFallback: Boolean = false,
+        fallbackStatus: String = "recording"
+    ): Boolean {
         if (sessionId.isBlank()) return false
-        val result = apiClient.patchSessionNotes(sessionId, notes)
+        var result = apiClient.patchSessionNotes(sessionId, notes)
+        if (result.isFailure) {
+            val isNotFound = (result.exceptionOrNull() as? HttpStatusException)?.code == 404
+            if (isNotFound && allowCreateFallback && sessionId.startsWith("sess-android-")) {
+                result = apiClient.upsertSessionNotesFallback(
+                    sessionId = sessionId,
+                    myNotes = notes,
+                    source = "android",
+                    status = fallbackStatus
+                )
+            }
+        }
         val stillSameSession = _uiState.value.currentSessionId == sessionId
         val stillSameContent = _uiState.value.myNotes == notes
         if (result.isSuccess) {
@@ -640,14 +799,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (sessionId.isBlank()) return
         val prevSessionId = _uiState.value.currentSessionId
         val prevNotes = _uiState.value.myNotes
+        val prevViewingTitle = _uiState.value.viewingSessionTitle
         val prevDirty = prevSessionId.isNotBlank() &&
             prevSessionId != sessionId &&
             (readLocalNotesDraft(prevSessionId) != null || notesSaveJob?.isActive == true)
         notesSaveJob?.cancel()
         notesSaveJob = null
         if (prevDirty) {
+            val prevAllowFallback = prevViewingTitle == null && prevSessionId.startsWith("sess-android-")
             viewModelScope.launch {
-                syncNotesToServer(prevSessionId, prevNotes)
+                syncNotesToServer(
+                    sessionId = prevSessionId,
+                    notes = prevNotes,
+                    allowCreateFallback = prevAllowFallback,
+                    fallbackStatus = "done"
+                )
             }
         }
 
@@ -661,7 +827,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val resolvedTitle = detail.title.ifBlank { summary?.title ?: "历史会话" }
                 val localDraft = readLocalNotesDraft(detail.id)
                 val (resolvedNotes, notesStatus) = resolveLoadedMyNotes(detail.myNotes, localDraft)
-                prefs.edit().putString(PREF_LAST_ACTIVE_SESSION_ID, detail.id).apply()
                 _uiState.update {
                     it.copy(
                         currentSessionId = detail.id,
@@ -678,7 +843,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (localDraft != null) {
                     notesSaveJob = viewModelScope.launch {
-                        syncNotesToServer(detail.id, localDraft)
+                        syncNotesToServer(detail.id, localDraft, allowCreateFallback = false)
                     }
                 }
                 showToast("已载入历史会话：$resolvedTitle")
@@ -784,7 +949,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ) {
                 notesSaveJob?.cancel()
                 notesSaveJob = null
-                syncNotesToServer(sessionId, notes)
+                val allowFallback = stateSnapshot.viewingSessionTitle == null &&
+                    sessionId.startsWith("sess-android-")
+                syncNotesToServer(
+                    sessionId = sessionId,
+                    notes = notes,
+                    allowCreateFallback = allowFallback,
+                    fallbackStatus = if (stateSnapshot.isRecording) "recording" else "done"
+                )
             }
             val result = apiClient.generateMinutes(
                 utterances = utterances,
@@ -793,12 +965,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sessionId = sessionId,
                 myNotes = notes
             )
+            if (result.isSuccess && sessionId != null && readLocalNotesDraft(sessionId) == notes) {
+                clearLocalNotesDraft(sessionId)
+            }
             _uiState.update { state ->
                 if (result.isSuccess) {
+                    val stillSameNotes = sessionId != null &&
+                        state.currentSessionId == sessionId &&
+                        state.myNotes == notes
                     state.copy(
                         minutes = result.getOrNull(),
                         isGeneratingMinutes = false,
-                        isMinutesPolishView = false
+                        isMinutesPolishView = false,
+                        myNotesSaveState = if (stillSameNotes) {
+                            if (notes.isNotBlank()) "已保存" else ""
+                        } else {
+                            state.myNotesSaveState
+                        }
                     )
                 } else {
                     state.copy(isGeneratingMinutes = false)

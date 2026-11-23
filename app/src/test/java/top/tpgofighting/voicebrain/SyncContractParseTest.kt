@@ -12,12 +12,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import top.tpgofighting.voicebrain.data.api.applyBearerToken
 import top.tpgofighting.voicebrain.data.api.buildGenerateMinutesPayload
+import top.tpgofighting.voicebrain.data.api.buildUpsertSessionNotesPayload
 import top.tpgofighting.voicebrain.data.api.parseMemoriesBody
 import top.tpgofighting.voicebrain.data.api.parseSessionDetailBody
 import top.tpgofighting.voicebrain.data.api.parseSessionsBody
 import top.tpgofighting.voicebrain.model.Persona
 import top.tpgofighting.voicebrain.model.Utterance
 import top.tpgofighting.voicebrain.ui.screens.resolveLoadedMyNotes
+import top.tpgofighting.voicebrain.ui.screens.resolveStartRecordingNotes
 import top.tpgofighting.voicebrain.ui.screens.sourceBadgeLabel
 import top.tpgofighting.voicebrain.ui.screens.utteranceDisplaySpeaker
 
@@ -400,5 +402,41 @@ class SyncContractParseTest {
             "" to "",
             resolveLoadedMyNotes(serverNotes = "", localDraft = null)
         )
+    }
+
+    @Test
+    fun buildUpsertSessionNotesPayloadOmitsUtterancesAndPinsAndroidSource() {
+        val payload = buildUpsertSessionNotesPayload(
+            sessionId = "sess-android-1732345678-1234",
+            myNotes = "首句前先记下的重点",
+            source = "android",
+            status = "recording"
+        )
+        assertEquals("sess-android-1732345678-1234", payload["id"]?.jsonPrimitive?.content)
+        assertEquals("android", payload["source"]?.jsonPrimitive?.content)
+        assertEquals("recording", payload["status"]?.jsonPrimitive?.content)
+        assertEquals("首句前先记下的重点", payload["myNotes"]?.jsonPrimitive?.content)
+        assertFalse(payload.containsKey("utterances"))
+    }
+
+    @Test
+    fun resolveStartRecordingNotesPreservesPreRecordingDraftOnlyWhenSessionBlank() {
+        val preserved = resolveStartRecordingNotes(prevSessionId = "", prevNotes = "会前准备要点")
+        assertTrue(preserved.preservePreRecordingDraft)
+        assertEquals("会前准备要点", preserved.initialNotes)
+        assertEquals("保存中…", preserved.initialSaveState)
+
+        val blankPreNotes = resolveStartRecordingNotes(prevSessionId = "", prevNotes = "   ")
+        assertFalse(blankPreNotes.preservePreRecordingDraft)
+        assertEquals("", blankPreNotes.initialNotes)
+        assertEquals("", blankPreNotes.initialSaveState)
+
+        val leavingExisting = resolveStartRecordingNotes(
+            prevSessionId = "sess-android-100",
+            prevNotes = "上一场会议笔记"
+        )
+        assertFalse(leavingExisting.preservePreRecordingDraft)
+        assertEquals("", leavingExisting.initialNotes)
+        assertEquals("", leavingExisting.initialSaveState)
     }
 }

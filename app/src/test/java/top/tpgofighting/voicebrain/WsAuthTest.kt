@@ -30,6 +30,7 @@ class WsAuthTest {
         val emptyObj = json.parseToJsonElement(emptyPayload).jsonObject
         assertEquals("start", emptyObj["type"]?.jsonPrimitive?.content)
         assertEquals("sess-1", emptyObj["sessionId"]?.jsonPrimitive?.content)
+        assertEquals("android", emptyObj["source"]?.jsonPrimitive?.content)
         assertEquals(800, emptyObj["maxSentenceSilence"]?.jsonPrimitive?.intOrNull)
         assertFalse(emptyObj.containsKey("authToken"))
 
@@ -37,6 +38,7 @@ class WsAuthTest {
         val whitespaceObj = json.parseToJsonElement(whitespacePayload).jsonObject
         assertEquals("start", whitespaceObj["type"]?.jsonPrimitive?.content)
         assertEquals("sess-2", whitespaceObj["sessionId"]?.jsonPrimitive?.content)
+        assertEquals("android", whitespaceObj["source"]?.jsonPrimitive?.content)
         assertEquals(1200, whitespaceObj["maxSentenceSilence"]?.jsonPrimitive?.intOrNull)
         assertFalse(whitespaceObj.containsKey("authToken"))
     }
@@ -48,6 +50,7 @@ class WsAuthTest {
         val obj = json.parseToJsonElement(payload).jsonObject
         assertEquals("start", obj["type"]?.jsonPrimitive?.content)
         assertEquals("sess-auth-1", obj["sessionId"]?.jsonPrimitive?.content)
+        assertEquals("android", obj["source"]?.jsonPrimitive?.content)
         assertEquals(500, obj["maxSentenceSilence"]?.jsonPrimitive?.intOrNull)
         assertEquals("""tok-"quoted"\slash""", obj["authToken"]?.jsonPrimitive?.content)
     }
