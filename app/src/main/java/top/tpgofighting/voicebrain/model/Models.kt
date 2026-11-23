@@ -14,7 +14,10 @@ data class Utterance(
     val latencyMs: Long = 0,
     // v1.1.0: 清洗稿单独存放，展示默认用原文（与 Web 端 Fix 2 对齐）；beginMs 供说话人分离对齐
     val cleansedText: String? = null,
-    val beginMs: Long = 0
+    val beginMs: Long = 0,
+    // v1.4.0: 双轨同步字段（single | me | them）与回声隐藏标记
+    val track: String = "single",
+    val hidden: Boolean = false
 )
 
 data class Persona(
@@ -232,7 +235,19 @@ data class SessionSummary(
     val title: String,
     val stamp: String = "",
     val utteranceCount: Int = 0,
-    val durationLabel: String = ""
+    val durationLabel: String = "",
+    val source: String = "android",
+    val myNotes: String = ""
+)
+
+/** 历史会话详情（GET /api/sessions/:id） */
+data class SessionDetail(
+    val id: String,
+    val title: String = "",
+    val source: String = "android",
+    val myNotes: String = "",
+    val utterances: List<Utterance> = emptyList(),
+    val minutes: Minutes? = null
 )
 
 /** 可选录音输入设备（内置麦 / USB 接收器如 DJI Mic Mini RX / 蓝牙等） */

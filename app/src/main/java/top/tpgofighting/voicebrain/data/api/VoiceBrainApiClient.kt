@@ -42,14 +42,20 @@ data class DiarizedSentence(
 )
 
 class VoiceBrainApiClient(
-    private val baseUrl: String = "https://voice.tpgofighting.top"
+    private val baseUrl: String = "https://voice.tpgofighting.top",
+    private val syncTokenProvider: () -> String = { "" }
 ) {
     companion object {
         private const val TAG = "VoiceBrainApiClient"
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 
+    private val authInterceptor = Interceptor { chain ->
+        chain.proceed(applyBearerToken(chain.request(), syncTokenProvider()))
+    }
+
     private val client = OkHttpClient.Builder()
+        .addInterceptor(authInterceptor)
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -58,6 +64,7 @@ class VoiceBrainApiClient(
     // 长耗时请求专用：Obsidian Agent 问答与纪要生成在服务端可达 90~120s，
     // 默认 60s 读超时会在答案返回前先断开，误报「网络异常」
     private val longClient = OkHttpClient.Builder()
+        .addInterceptor(authInterceptor)
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(150, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -65,6 +72,7 @@ class VoiceBrainApiClient(
 
     // 流式问答专用：读超时放宽，逐行消费 SSE
     private val streamClient = OkHttpClient.Builder()
+        .addInterceptor(authInterceptor)
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -74,36 +82,25 @@ class VoiceBrainApiClient(
 
     /**
      * 生成结构化纪要（v1.1.0 契约对齐：请求发 persona/template/sessionId，
-     * 响应从 data 层解析，未决事项读 unresolved_risks）
+     * v1.4.0 支持附带 myNotes；响应从 data 层解析，未决事项读 unresolved_risks）
      */
     suspend fun generateMinutes(
         utterances: List<Utterance>,
         persona: Persona,
         template: String = "general",
         sessionId: String? = null,
-        customTitle: String? = null
+        customTitle: String? = null,
+        myNotes: String = ""
     ): Result<Minutes> = withContext(Dispatchers.IO) {
         try {
-            val uttArray = buildJsonArray {
-                utterances.forEach { u ->
-                    add(buildJsonObject {
-                        put("id", u.id)
-                        put("speaker", u.speaker)
-                        put("time", u.time)
-                        put("text", u.rawText.ifBlank { u.text })
-                        put("rawText", u.rawText.ifBlank { u.text })
-                        if (!u.cleansedText.isNullOrBlank()) put("displayText", u.cleansedText)
-                    })
-                }
-            }
-
-            val bodyJson = buildJsonObject {
-                put("utterances", uttArray)
-                put("persona", persona.id)
-                put("template", template)
-                if (sessionId != null) put("sessionId", sessionId)
-                if (customTitle != null) put("customTitle", customTitle)
-            }.toString()
+            val bodyJson = buildGenerateMinutesPayload(
+                utterances = utterances,
+                persona = persona,
+                template = template,
+                sessionId = sessionId,
+                customTitle = customTitle,
+                myNotes = myNotes
+            ).toString()
 
             val request = Request.Builder()
                 .url("$baseUrl/api/llm/generate-minutes")
@@ -205,20 +202,7 @@ class VoiceBrainApiClient(
                 return@withContext Result.failure(Exception("HTTP ${response.code}: $respBody"))
             }
 
-            val obj = json.parseToJsonElement(respBody).jsonObject
-            val memList = obj["memories"]?.jsonArray?.mapIndexed { idx, it ->
-                val m = it.jsonObject
-                MemoryItem(
-                    id = m["id"]?.jsonPrimitive?.content ?: "mem-$idx",
-                    category = m["category"]?.jsonPrimitive?.content ?: "fact",
-                    content = m["content"]?.jsonPrimitive?.content ?: "",
-                    tags = m["tags"]?.jsonArray?.map { t -> t.jsonPrimitive.content } ?: emptyList(),
-                    importance = m["importance"]?.jsonPrimitive?.intOrNull ?: 3,
-                    createdAt = m["createdAt"]?.jsonPrimitive?.content ?: ""
-                )
-            } ?: emptyList()
-
-            Result.success(memList)
+            Result.success(parseMemoriesBody(respBody))
         } catch (e: Exception) {
             Log.e(TAG, "fetchMemories failed: ${e.message}", e)
             Result.failure(e)
@@ -358,26 +342,15 @@ class VoiceBrainApiClient(
             if (!response.isSuccessful) {
                 return@withContext Result.failure(Exception("HTTP ${response.code}"))
             }
-            val arr = json.parseToJsonElement(respBody).jsonArray
-            val list = arr.map { s ->
-                val so = s.jsonObject
-                val utterances = so["utterances"]?.jsonArray
-                SessionSummary(
-                    id = so["id"]?.jsonPrimitive?.content ?: "",
-                    title = so["title"]?.jsonPrimitive?.content ?: so["topic"]?.jsonPrimitive?.content ?: "未命名会话",
-                    stamp = so["createdAt"]?.jsonPrimitive?.content ?: "",
-                    utteranceCount = utterances?.size ?: 0
-                )
-            }.filter { it.id.isNotBlank() }
-            Result.success(list)
+            Result.success(parseSessionsBody(respBody))
         } catch (e: Exception) {
             Log.e(TAG, "fetchSessions failed: ${e.message}", e)
             Result.failure(e)
         }
     }
 
-    /** 读取单个历史会话的逐字稿 */
-    suspend fun fetchSession(sessionId: String): Result<List<Utterance>> = withContext(Dispatchers.IO) {
+    /** 读取单个历史会话详情（含 source、myNotes、可见逐字稿与可选纪要） */
+    suspend fun fetchSessionDetail(sessionId: String): Result<SessionDetail> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder().url("$baseUrl/api/sessions/$sessionId").get().build()
             val response = client.newCall(request).execute()
@@ -385,25 +358,44 @@ class VoiceBrainApiClient(
             if (!response.isSuccessful) {
                 return@withContext Result.failure(Exception("HTTP ${response.code}"))
             }
-            val so = json.parseToJsonElement(respBody).jsonObject
-            val utterances = so["utterances"]?.jsonArray?.mapIndexed { idx, u ->
-                val uo = u.jsonObject
-                val raw = uo["rawText"]?.jsonPrimitive?.content ?: uo["text"]?.jsonPrimitive?.content ?: ""
-                Utterance(
-                    id = uo["id"]?.jsonPrimitive?.intOrNull ?: (idx + 1),
-                    sentenceId = uo["sentenceId"]?.jsonPrimitive?.content ?: "sess-$idx",
-                    speaker = uo["speaker"]?.jsonPrimitive?.content ?: "发言人",
-                    time = uo["time"]?.jsonPrimitive?.content ?: "",
-                    text = raw,
-                    rawText = raw,
-                    isCleansed = uo["isCleansed"]?.jsonPrimitive?.booleanOrNull ?: false,
-                    cleansedText = uo["displayText"]?.jsonPrimitive?.content,
-                    beginMs = uo["begin_time"]?.jsonPrimitive?.longOrNull ?: 0L
-                )
-            } ?: emptyList()
-            Result.success(utterances)
+            Result.success(parseSessionDetailBody(sessionId, respBody))
         } catch (e: Exception) {
-            Log.e(TAG, "fetchSession failed: ${e.message}", e)
+            Log.e(TAG, "fetchSessionDetail failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /** 读取单个历史会话的逐字稿 */
+    suspend fun fetchSession(sessionId: String): Result<List<Utterance>> =
+        fetchSessionDetail(sessionId).map { it.utterances }
+
+    /** 更新会话个人笔记（PATCH /api/sessions/:id/notes） */
+    suspend fun patchSessionNotes(
+        sessionId: String,
+        myNotes: String,
+        updatedAt: String? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val ts = updatedAt?.trim()?.takeIf { it.isNotEmpty() }
+                ?: java.time.Instant.now().toString()
+            val bodyJson = buildJsonObject {
+                put("myNotes", myNotes)
+                put("updatedAt", ts)
+            }.toString()
+
+            val request = Request.Builder()
+                .url("$baseUrl/api/sessions/$sessionId/notes")
+                .patch(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val respBody = response.body?.string() ?: ""
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}: $respBody"))
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "patchSessionNotes failed: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -654,5 +646,241 @@ internal fun parseObsidianStatusBody(body: String): ObsidianStatus {
         totalNotes = agent?.get("notes")?.jsonPrimitive?.intOrNull ?: 0,
         syncedVoiceNotes = data["voiceNotesCount"]?.jsonPrimitive?.intOrNull ?: 0,
         hermesAvailable = agentOk
+    )
+}
+
+internal fun applyBearerToken(request: Request, rawToken: String): Request {
+    val token = rawToken.trim()
+    if (token.isEmpty() || request.header("Authorization") != null) return request
+    return request.newBuilder()
+        .header("Authorization", "Bearer $token")
+        .build()
+}
+
+internal fun buildGenerateMinutesPayload(
+    utterances: List<Utterance>,
+    persona: Persona,
+    template: String = "general",
+    sessionId: String? = null,
+    customTitle: String? = null,
+    myNotes: String = ""
+): JsonObject {
+    val uttArray = buildJsonArray {
+        utterances.filterNot { it.hidden }.forEach { u ->
+            add(buildJsonObject {
+                put("id", u.id)
+                put("speaker", u.speaker)
+                put("track", u.track)
+                put("time", u.time)
+                put("text", u.rawText.ifBlank { u.text })
+                put("rawText", u.rawText.ifBlank { u.text })
+                if (!u.cleansedText.isNullOrBlank()) put("displayText", u.cleansedText)
+            })
+        }
+    }
+    return buildJsonObject {
+        put("utterances", uttArray)
+        put("persona", persona.id)
+        put("template", template)
+        if (sessionId != null) put("sessionId", sessionId)
+        if (customTitle != null) put("customTitle", customTitle)
+        if (myNotes.isNotBlank()) put("myNotes", myNotes)
+    }
+}
+
+/**
+ * 解析 /api/memory/all 的响应体：兼容 Scheme B 裸 JSON 数组 [...] 与旧式包装对象 {"memories": [...]}。
+ */
+internal fun parseMemoriesBody(body: String): List<MemoryItem> {
+    if (body.isBlank()) return emptyList()
+    val element = obsidianStatusJson.parseToJsonElement(body)
+    val arr = when (element) {
+        is JsonArray -> element
+        is JsonObject -> element["memories"] as? JsonArray ?: return emptyList()
+        else -> return emptyList()
+    }
+    return arr.mapIndexedNotNull { idx, item ->
+        val m = item as? JsonObject ?: return@mapIndexedNotNull null
+        val tags = (m["tags"] as? JsonArray)?.mapNotNull { t ->
+            (t as? JsonPrimitive)?.contentOrNull
+        } ?: emptyList()
+        MemoryItem(
+            id = (m["id"] as? JsonPrimitive)?.contentOrNull ?: "mem-$idx",
+            category = (m["category"] as? JsonPrimitive)?.contentOrNull ?: "fact",
+            content = (m["content"] as? JsonPrimitive)?.contentOrNull ?: "",
+            tags = tags,
+            importance = (m["importance"] as? JsonPrimitive)?.intOrNull ?: 3,
+            createdAt = (m["createdAt"] as? JsonPrimitive)?.contentOrNull ?: ""
+        )
+    }
+}
+
+/**
+ * 解析 /api/sessions 的响应体（Scheme B 裸数组），提取 source 与 myNotes 并排除 hidden 回声句。
+ */
+internal fun parseSessionsBody(body: String): List<SessionSummary> {
+    if (body.isBlank()) return emptyList()
+    val element = obsidianStatusJson.parseToJsonElement(body)
+    val arr = when (element) {
+        is JsonArray -> element
+        is JsonObject -> element["sessions"] as? JsonArray ?: return emptyList()
+        else -> return emptyList()
+    }
+    return arr.mapNotNull { s ->
+        val so = s as? JsonObject ?: return@mapNotNull null
+        val id = (so["id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+            ?: return@mapNotNull null
+        val utterances = so["utterances"] as? JsonArray
+        val visibleCount = utterances?.count { el ->
+            val uo = el as? JsonObject
+            uo == null || ((uo["hidden"] as? JsonPrimitive)?.booleanOrNull != true &&
+                (uo["hidden"] as? JsonPrimitive)?.intOrNull != 1)
+        } ?: (so["utterancesCount"] as? JsonPrimitive)?.intOrNull
+            ?: (so["utteranceCount"] as? JsonPrimitive)?.intOrNull
+            ?: 0
+        val durationSeconds = (so["durationSeconds"] as? JsonPrimitive)?.intOrNull ?: 0
+        val durationLabel = (so["durationLabel"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+            ?: formatDurationLabel(durationSeconds)
+        SessionSummary(
+            id = id,
+            title = (so["title"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: (so["topic"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: "未命名会话",
+            stamp = (so["createdAt"] as? JsonPrimitive)?.contentOrNull ?: "",
+            utteranceCount = visibleCount,
+            durationLabel = durationLabel,
+            source = (so["source"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: "android",
+            myNotes = (so["myNotes"] as? JsonPrimitive)?.contentOrNull ?: ""
+        )
+    }
+}
+
+/**
+ * 解析 /api/sessions/:id 的响应体，保留 source / myNotes / 双轨 track & speaker，
+ * 并自动过滤 hidden == true 的桌面端回声去重句。
+ */
+internal fun parseSessionDetailBody(sessionId: String, body: String): SessionDetail {
+    val root = obsidianStatusJson.parseToJsonElement(body).jsonObject
+    val so = (root["session"] as? JsonObject) ?: root
+    val resolvedId = (so["id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: sessionId
+    val resolvedTitle = (so["title"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        ?: (so["topic"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        ?: ""
+    val source = (so["source"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: "android"
+    val myNotes = (so["myNotes"] as? JsonPrimitive)?.contentOrNull ?: ""
+    val utterances = (so["utterances"] as? JsonArray)?.mapIndexedNotNull { idx, u ->
+        val uo = u as? JsonObject ?: return@mapIndexedNotNull null
+        val hidden = (uo["hidden"] as? JsonPrimitive)?.booleanOrNull
+            ?: ((uo["hidden"] as? JsonPrimitive)?.intOrNull == 1)
+        if (hidden) return@mapIndexedNotNull null
+        val track = (uo["track"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: "single"
+        val defaultSpeaker = when (track) {
+            "me" -> "我"
+            "them" -> "对方"
+            else -> "发言人"
+        }
+        val speaker = (uo["speaker"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: defaultSpeaker
+        val raw = (uo["rawText"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+            ?: (uo["text"] as? JsonPrimitive)?.contentOrNull
+            ?: ""
+        Utterance(
+            id = (uo["id"] as? JsonPrimitive)?.intOrNull
+                ?: (uo["seq"] as? JsonPrimitive)?.intOrNull
+                ?: (idx + 1),
+            sentenceId = (uo["sentenceId"] as? JsonPrimitive)?.contentOrNull ?: "sess-$idx",
+            speaker = speaker,
+            time = (uo["time"] as? JsonPrimitive)?.contentOrNull ?: "",
+            text = raw,
+            rawText = raw,
+            isCleansed = (uo["isCleansed"] as? JsonPrimitive)?.booleanOrNull
+                ?: ((uo["isCleansed"] as? JsonPrimitive)?.intOrNull == 1),
+            cleansedText = (uo["displayText"] as? JsonPrimitive)?.contentOrNull,
+            beginMs = (uo["startMs"] as? JsonPrimitive)?.longOrNull
+                ?: (uo["beginMs"] as? JsonPrimitive)?.longOrNull
+                ?: (uo["begin_time"] as? JsonPrimitive)?.longOrNull
+                ?: 0L,
+            track = track,
+            hidden = false
+        )
+    } ?: emptyList()
+
+    val minutesObj = so["minutes"] as? JsonObject
+    val minutes = minutesObj?.let { mo ->
+        val durationSeconds = (so["durationSeconds"] as? JsonPrimitive)?.intOrNull ?: 0
+        parseMinutesObject(
+            obj = mo,
+            fallbackTitle = resolvedTitle.ifBlank { "语音纪要" },
+            fallbackDate = (so["updatedAt"] as? JsonPrimitive)?.contentOrNull
+                ?: (so["createdAt"] as? JsonPrimitive)?.contentOrNull
+                ?: "",
+            fallbackDuration = formatDurationLabel(durationSeconds),
+            polishedDraft = (so["polishedDraft"] as? JsonPrimitive)?.contentOrNull ?: ""
+        )
+    }
+
+    return SessionDetail(
+        id = resolvedId,
+        title = resolvedTitle,
+        source = source,
+        myNotes = myNotes,
+        utterances = utterances,
+        minutes = minutes
+    )
+}
+
+private fun formatDurationLabel(durationSeconds: Int): String {
+    if (durationSeconds <= 0) return ""
+    val mins = durationSeconds / 60
+    val secs = durationSeconds % 60
+    return if (mins > 0) "${mins}分${secs}秒" else "${secs}秒"
+}
+
+private fun parseMinutesObject(
+    obj: JsonObject,
+    fallbackTitle: String,
+    fallbackDate: String,
+    fallbackDuration: String,
+    polishedDraft: String = ""
+): Minutes {
+    val title = (obj["title"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: fallbackTitle
+    val tldr = (obj["tldr"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList()
+    val decisions = (obj["decisions"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList()
+    val actionItems = (obj["action_items"] as? JsonArray)?.mapIndexedNotNull { idx, it ->
+        val itemObj = it as? JsonObject ?: return@mapIndexedNotNull null
+        ActionItem(
+            id = "act-$idx",
+            task = (itemObj["task"] as? JsonPrimitive)?.contentOrNull ?: "",
+            assignee = (itemObj["assignee"] as? JsonPrimitive)?.contentOrNull ?: "待定",
+            priority = (itemObj["priority"] as? JsonPrimitive)?.contentOrNull ?: "P1",
+            status = (itemObj["status"] as? JsonPrimitive)?.contentOrNull ?: "pending"
+        )
+    } ?: emptyList()
+    val unresolvedArr = (obj["unresolved_risks"] as? JsonArray) ?: (obj["unresolved_questions"] as? JsonArray)
+    val unresolved = unresolvedArr?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList()
+    val mindmap = (obj["mindmap_markdown"] as? JsonPrimitive)?.contentOrNull ?: ""
+    val respTemplate = (obj["template"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: "general"
+    val respTemplateLabel = (obj["templateLabel"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        ?: MINUTES_TEMPLATES.firstOrNull { it.id == respTemplate }?.label ?: "通用"
+    val personaId = (obj["persona_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        ?: (obj["personaId"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        ?: ""
+    val personaName = (obj["persona_name"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        ?: (obj["personaName"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        ?: ""
+
+    return Minutes(
+        title = title,
+        date = (obj["date"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: fallbackDate,
+        duration = (obj["duration"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() } ?: fallbackDuration,
+        personaId = personaId,
+        personaName = personaName,
+        tldr = tldr,
+        decisions = decisions,
+        actionItems = actionItems,
+        unresolvedQuestions = unresolved,
+        mindmapMarkdown = mindmap,
+        polishedDraft = polishedDraft.ifBlank { (obj["polishedDraft"] as? JsonPrimitive)?.contentOrNull ?: "" },
+        template = respTemplate,
+        templateLabel = respTemplateLabel
     )
 }
