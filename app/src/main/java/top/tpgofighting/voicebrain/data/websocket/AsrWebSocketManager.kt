@@ -6,6 +6,7 @@ import kotlinx.serialization.json.*
 import okhttp3.*
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
+import top.tpgofighting.voicebrain.data.api.sanitizeSyncToken
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 
@@ -51,6 +52,9 @@ class AsrWebSocketManager(
     @Volatile
     private var isConnected = false
 
+    @Volatile
+    private var authFailed = false
+
     // 环形 PCM 缓冲队列，断线自愈重连时保留最近 15 秒音频
     private val pcmBuffer = ConcurrentLinkedQueue<ByteArray>()
 
@@ -58,10 +62,13 @@ class AsrWebSocketManager(
 
     fun start() {
         isRecording = true
+        authFailed = false
         sessionId = "sess-android-" + System.currentTimeMillis() + "-" + (1000..9999).random()
         reconnectAttempts = 0
         connect()
-        startPingTimer()
+        if (isRecording) {
+            startPingTimer()
+        }
     }
 
     fun updateSentenceSilence(silenceMs: Int) {
@@ -71,8 +78,29 @@ class AsrWebSocketManager(
         }
     }
 
+    private fun handleAuthRejected() {
+        isRecording = false
+        isConnected = false
+        pingJob?.cancel()
+        pingJob = null
+        if (!authFailed) {
+            authFailed = true
+            onEvent(AsrEvent.Error(WS_UNAUTHORIZED_MESSAGE))
+        }
+    }
+
     private fun connect() {
-        val request = buildWebSocketRequest(serverUrl, syncTokenProvider())
+        val request = try {
+            buildWebSocketRequest(serverUrl, syncTokenProvider())
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Invalid WebSocket request: ${e.message}")
+            isRecording = false
+            isConnected = false
+            pingJob?.cancel()
+            pingJob = null
+            onEvent(AsrEvent.Error("连接参数无效：${e.message ?: "请检查同步令牌"}"))
+            return
+        }
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 Log.i(TAG, "WebSocket connected to $serverUrl")
@@ -95,26 +123,36 @@ class AsrWebSocketManager(
             override fun onClosing(ws: WebSocket, code: Int, reason: String) {
                 Log.i(TAG, "WebSocket closing: $code / $reason")
                 isConnected = false
+                if (code == WS_CLOSE_UNAUTHORIZED) {
+                    handleAuthRejected()
+                }
             }
 
             override fun onClosed(ws: WebSocket, code: Int, reason: String) {
                 Log.i(TAG, "WebSocket closed: $code / $reason")
                 isConnected = false
-                if (isRecording) {
-                    onEvent(AsrEvent.Reconnecting("长连接断开，正在自动续连中..."))
+                val action = decideWsCloseAction(code, isRecording)
+                if (action.isAuthFailure) {
+                    handleAuthRejected()
+                } else if (action.shouldReconnect) {
+                    onEvent(action.event)
                     scheduleReconnect()
-                } else {
-                    onEvent(AsrEvent.Finished)
+                } else if (!authFailed) {
+                    onEvent(action.event)
                 }
             }
 
             override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
                 Log.e(TAG, "WebSocket failure: ${t.message}")
                 isConnected = false
+                if (response?.code == 401) {
+                    handleAuthRejected()
+                    return
+                }
                 if (isRecording) {
                     onEvent(AsrEvent.Reconnecting("网络抖动，正在自愈重连中..."))
                     scheduleReconnect()
-                } else {
+                } else if (!authFailed) {
                     onEvent(AsrEvent.Error(t.message ?: "网络连接异常"))
                 }
             }
@@ -159,9 +197,13 @@ class AsrWebSocketManager(
                         onEvent(AsrEvent.Finished)
                     }
                 }
-                "asr_error" -> {
-                    val msg = obj["message"]?.jsonPrimitive?.content ?: "识别服务异常"
-                    onEvent(AsrEvent.Error(msg))
+                "error", "asr_error" -> {
+                    val err = parseWsErrorFrame(obj)
+                    if (err.isUnauthorized) {
+                        handleAuthRejected()
+                    } else {
+                        onEvent(AsrEvent.Error(err.message))
+                    }
                 }
                 "pong" -> {
                     // 心跳存活确认
@@ -247,11 +289,60 @@ class AsrWebSocketManager(
     }
 }
 
+internal const val WS_CLOSE_UNAUTHORIZED = 4401
+internal const val WS_UNAUTHORIZED_MESSAGE = "同步令牌无效或未授权"
+
+internal data class WsCloseAction(
+    val shouldReconnect: Boolean,
+    val isAuthFailure: Boolean,
+    val event: AsrEvent
+)
+
+internal fun decideWsCloseAction(code: Int, isRecording: Boolean): WsCloseAction {
+    if (code == WS_CLOSE_UNAUTHORIZED) {
+        return WsCloseAction(
+            shouldReconnect = false,
+            isAuthFailure = true,
+            event = AsrEvent.Error(WS_UNAUTHORIZED_MESSAGE)
+        )
+    }
+    return if (isRecording) {
+        WsCloseAction(
+            shouldReconnect = true,
+            isAuthFailure = false,
+            event = AsrEvent.Reconnecting("长连接断开，正在自动续连中...")
+        )
+    } else {
+        WsCloseAction(
+            shouldReconnect = false,
+            isAuthFailure = false,
+            event = AsrEvent.Finished
+        )
+    }
+}
+
+internal data class WsErrorFrame(
+    val isUnauthorized: Boolean,
+    val message: String
+)
+
+internal fun parseWsErrorFrame(obj: JsonObject): WsErrorFrame {
+    val code = obj["code"]?.jsonPrimitive?.intOrNull
+    val isUnauthorized = code == WS_CLOSE_UNAUTHORIZED
+    val rawMessage = obj["message"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+    val message = if (isUnauthorized) {
+        WS_UNAUTHORIZED_MESSAGE
+    } else {
+        rawMessage ?: "识别服务异常"
+    }
+    return WsErrorFrame(isUnauthorized = isUnauthorized, message = message)
+}
+
 internal fun buildWebSocketRequest(serverUrl: String, syncToken: String = ""): Request {
     val builder = Request.Builder().url(serverUrl)
-    val trimmed = syncToken.trim()
-    if (trimmed.isNotEmpty()) {
-        builder.header("Authorization", "Bearer $trimmed")
+    val sanitized = sanitizeSyncToken(syncToken)
+    if (sanitized.isNotEmpty()) {
+        builder.header("Authorization", "Bearer $sanitized")
     }
     return builder.build()
 }
@@ -261,13 +352,13 @@ internal fun buildStartCommandJson(
     sentenceSilenceMs: Int,
     syncToken: String = ""
 ): String {
-    val trimmed = syncToken.trim()
+    val sanitized = sanitizeSyncToken(syncToken)
     return buildJsonObject {
         put("type", "start")
         put("sessionId", sessionId)
         put("maxSentenceSilence", sentenceSilenceMs)
-        if (trimmed.isNotEmpty()) {
-            put("authToken", trimmed)
+        if (sanitized.isNotEmpty()) {
+            put("authToken", sanitized)
         }
     }.toString()
 }

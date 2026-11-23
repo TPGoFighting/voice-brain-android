@@ -649,8 +649,11 @@ internal fun parseObsidianStatusBody(body: String): ObsidianStatus {
     )
 }
 
+internal fun sanitizeSyncToken(rawToken: String): String =
+    rawToken.trim().filter { it in '\u0021'..'\u007e' }
+
 internal fun applyBearerToken(request: Request, rawToken: String): Request {
-    val token = rawToken.trim()
+    val token = sanitizeSyncToken(rawToken)
     if (token.isEmpty() || request.header("Authorization") != null) return request
     return request.newBuilder()
         .header("Authorization", "Bearer $token")

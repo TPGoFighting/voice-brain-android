@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import top.tpgofighting.voicebrain.data.api.VoiceBrainApiClient
+import top.tpgofighting.voicebrain.data.api.sanitizeSyncToken
 import top.tpgofighting.voicebrain.data.audio.AudioRecorderManager
 import top.tpgofighting.voicebrain.data.websocket.AsrEvent
 import top.tpgofighting.voicebrain.data.websocket.AsrWebSocketManager
@@ -150,7 +151,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 batteryHintHandled = prefs.getBoolean(PREF_BATTERY_HINT_HANDLED, false),
                 hasRecordedOnce = prefs.getBoolean(PREF_HAS_RECORDED_ONCE, false),
-                syncToken = prefs.getString(PREF_SYNC_TOKEN, "") ?: ""
+                syncToken = sanitizeSyncToken(prefs.getString(PREF_SYNC_TOKEN, "") ?: "")
             )
         }
         initWelcomeMessages()
@@ -499,7 +500,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateSyncToken(token: String) {
-        val cleaned = token.trim()
+        val cleaned = sanitizeSyncToken(token)
         _uiState.update { it.copy(syncToken = cleaned) }
         prefs.edit().putString(PREF_SYNC_TOKEN, cleaned).apply()
     }
